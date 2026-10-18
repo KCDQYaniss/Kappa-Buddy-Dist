@@ -1,0 +1,108 @@
+      dlg.remove();
+      syncLayers(); renderSidebar();
+    };
+    $("cp-cancel").onclick = () => { dlg.close(); dlg.remove(); };
+  }
+
+  function openEditDialog(encoded) {
+    try {
+      const cp = JSON.parse(decodeURIComponent(encoded));
+      if (!cp || cp.map !== cur.slug) return;
+      const html = `
+        <div class="custom-point-modal">
+          <h4>${t("map.customEdit")}</h4>
+          <label>${t("map.customName")} : <input id="cp-name" class="txt" type="text" value="${esc(cp.name||"")}"></label>
+          <label>${t("map.customText")} : <textarea id="cp-text" class="txt" rows="2">${esc(cp.text||"")}</textarea></label>
+          <label>${t("map.customKey")} : <input id="cp-key" class="txt" type="text" value="${esc(cp.key||"")}"></label>
+          <label>${t("map.customIcon")} : 
+            <select id="cp-icon">${CUSTOM_ICONS.map(ic=>`<option value="${ic.type}"${ic.type===cp.iconType?" selected":""}>${ic.label}</option>`).join("")}</select>
+          </label>
+          <div class="cp-ctr"><button id="cp-ok" class="btn primary">${t("map.customSave")}</button><button id="cp-cancel" class="btn">${t("map.cancel")}</button></div>
+        </div>`;
+      const dlg = document.createElement("dialog");
+      dlg.innerHTML = `<div class="modal-overlay"><form method="dialog">${html}</form></div>`;
+      document.body.appendChild(dlg);
+      dlg.showModal();
+      $("cp-ok").onclick = () => {
+        const idx = USER_POINTS.findIndex(p => p.map===cp.map && p.x===cp.x && p.y===cp.y);
+        if (idx >= 0) {
+          USER_POINTS[idx].name = $("cp-name").value.trim() || null;
+          USER_POINTS[idx].text = $("cp-text").value.trim() || null;
+          USER_POINTS[idx].key = $("cp-key").value.trim() || null;
+        }
+        saveCustomPoints();
+        dlg.close(); dlg.remove();
+        syncLayers(); renderSidebar();
+      };
+      $("cp-cancel").onclick = () => { dlg.close(); dlg.remove(); };
+    } catch { /* ignore malformed data */ }
+  }
+
+    try { localStorage.setItem("customPoints", JSON.stringify(customPoints)); } catch { }
+  }
+
+  function refreshEmpty() {
+    const empty = $("empty"), slug = resolveSlug();
+    if (!cur && !slug) { $("empty-text").textContent = t("map.empty.noMap"); empty.hidden = false; }
+    else if (!lastPos) { $("empty-text").textContent = t("map.empty.noPos"); empty.hidden = false; }
+    else empty.hidden = true;
+  }
+
+  function init(calibrations) {
+    calibs = calibrations; bySlug = Object.fromEntries(calibs.map((m) => [m.slug, m]));
+    const sel = $("map-select");
+    sel.append(new Option(t("map.auto"), "auto"));
+    calibs.forEach((m) => sel.append(new Option(m.name, m.slug)));
+    sel.value = manualSlug;
+    sel.addEventListener("change", () => {
+      manualSlug = sel.value;
+      const slug = resolveSlug();
+      if (slug) {
+        rememberMap(slug);
+        lastPos = null; $("readout").hidden = true;
+        if (cur && cur.marker) { cur.marker.remove(); cur.marker = null; }
+        showMap(slug);
+      }
+      updateChip(); refreshEmpty();
+    });
+    $("follow-btn").addEventListener("click", () => setFollow(!follow));
+    $("center-btn").addEventListener("click", centerOnPlayer);
+    $("map-source").addEventListener("click", onChip);
+    const fb = $("floor-bar");
+    if (fb) fb.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-floor],[data-floor-auto]");
+      if (!b || !cur) return;
+      if (b.dataset.floorAuto) { cur.floorAuto = true; if (lastPos) applyAutoFloor(lastPos.y); else renderFloors(); }
+      else { cur.floorAuto = false; setFloorLayer(+b.dataset.floor); }
+    });
+    const side = $("map-side");
+    side.addEventListener("change", onSideEvent);
+    side.addEventListener("click", onSideClick);
+    side.addEventListener("input", onSideInput);
+    setFollow(follow);
+    // On rouvre sur la carte du dernier lancement s'il n'y a rien de mieux ; un raid détecté reprend la main.
+    let s = resolveSlug();
+    if (!s) { try { s = localStorage.getItem("lastMap"); } catch (_) { s = null; } }
+    if (s && bySlug[s]) showMap(s);
+    updateChip(); refreshEmpty();
+    TT.store.on((k) => { if (!cur) return; if (k === "data" || k === "progress") { syncLayers(); renderSidebar(); } else if (k === "status" && !TT.store.S.idx) renderSidebar(); });
+  }
+
+  /** Redessine tout ce qui contient du texte traduit (changement de langue). */
+  function refresh() {
+    if (!cur) return;
+    renderSidebar(); renderFloors(); updateChip(); refreshEmpty();
+  }
+
+  TT.mapview = { init, updateChip, setAuto, onPosition, onMap, showSlug, highlightItem, locateItem, focusTaskOnMap, setFollow, onShow, resolveSlug, refresh, isFollowing: () => follow, current: () => cur };
+  TT.i18n.onChange(refresh);
+    }
+  
+    /** Redessine tout ce qui contient du texte traduit (changement de langue). */
+    function refresh() {
+      if (!cur) return;
+      renderSidebar(); renderFloors(); updateChip(); refreshEmpty();
+    }
+  
+    TT.mapview = { init, updateChip, setAuto, onPosition, onMap, showSlug, highlightItem, locateItem, focusTaskOnMap, setFollow, onShow, resolveSlug, refresh, isFollowing: () => follow, current: () => cur };
+    TT.i18n.onChange(refresh);

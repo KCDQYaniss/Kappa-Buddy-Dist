@@ -1,0 +1,197 @@
+# Release pipeline for tarkov-price-overlay
+#
+# What it does:
+#   1. Verifies version is bumped consistently across package.json / Cargo.toml / tauri.conf.json
+#   2. Runs full build (PyInstaller + Tauri NSIS) via build.ps1
+#   3. Pushes dev branch
+#   4. Merges dev -> master, pushes master, tags vX.Y.Z
+#   5. Creates GitHub Release on the PUBLIC distribution repo (tarkov-price-overlay-releases)
+#      with the .exe attached
+#   6. Returns to dev branch
+#
+# Usage:
+#   pwsh -File scripts\release.ps1 -Version 0.1.2 -Notes "release notes here"
+# or:
+#   powershell -ExecutionPolicy Bypass -File scripts\release.ps1 -Version 0.1.2 -Notes "..."
+
+param(
+    [Parameter(Mandatory=$true)] [string]$Version,
+    [Parameter(Mandatory=$true)] [string]$Notes
+)
+
+$ErrorActionPreference = "Stop"
+$root = Split-Path -Parent $PSScriptRoot
+Set-Location $root
+
+$ghExe = "C:\Program Files\GitHub CLI\gh.exe"
+$publicRepo = "pado8/tarkov-price-overlay-releases"
+
+# Tauri updater signing — required so the in-app updater (v1.0.10+) can
+# verify each new release's signature against the pubkey baked into the
+# app. The private key lives in $HOME\.tauri\ and is NEVER checked in.
+# The password protects the key file content; the env vars are read by
+# `tauri build` during the bundle step.
+$signingKeyPath = Join-Path $HOME ".tauri\tarkov-overlay.key"
+if (-not (Test-Path $signingKeyPath)) {
+    throw "Updater signing key not found at $signingKeyPath. Generate it once with: npx tauri signer generate -w `"$signingKeyPath`""
+}
+if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
+    $sec = Read-Host "Updater key password" -AsSecureString
+    $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
+    $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+}
+# Tauri 2.11's bundle step only checks TAURI_SIGNING_PRIVATE_KEY (despite
+# `tauri signer generate` advertising a _PATH variant — that one is only
+# read by the signer subcommand). The env value accepts either the raw key
+# content OR a path to the key file; Tauri auto-detects.
+$env:TAURI_SIGNING_PRIVATE_KEY = $signingKeyPath
+
+# Validate semver-ish
+if ($Version -notmatch '^\d+\.\d+\.\d+$') {
+    throw "Version must be like 0.1.2 (got '$Version')"
+}
+$tag = "v$Version"
+
+Write-Host "[release] === preparing $tag ==="
+
+# 1. Verify versions are consistent
+$pkg = (Get-Content "$root\package.json" -Raw | ConvertFrom-Json).version
+$cargoLine = (Get-Content "$root\src-tauri\Cargo.toml" | Select-String '^version\s*=').Line
+$cargo = $cargoLine -replace '^version\s*=\s*"([^"]+)".*', '$1'
+$tauriCfg = (Get-Content "$root\src-tauri\tauri.conf.json" -Raw | ConvertFrom-Json).version
+
+Write-Host "[release] versions: package.json=$pkg, Cargo.toml=$cargo, tauri.conf.json=$tauriCfg"
+foreach ($v in @($pkg, $cargo, $tauriCfg)) {
+    if ($v -ne $Version) {
+        throw "Version mismatch: expected $Version but found '$pkg' / '$cargo' / '$tauriCfg'. Bump all three first."
+    }
+}
+
+# 2. Confirm we're on dev with clean tree
+$branch = (& git branch --show-current).Trim()
+if ($branch -ne "dev") {
+    throw "Must be on 'dev' branch (currently '$branch'). Run: git checkout dev"
+}
+$dirty = & git status --porcelain
+if ($dirty) {
+    throw "Working tree is dirty. Commit or stash first:`n$dirty"
+}
+
+# 3. Full build
+# Kill any running app/sidecar first — they hold file locks on
+# target\release + binaries\_internal and the build dies with os error 5/32
+# (this bit us on v1.1.0 and v1.1.1).
+# -like: the staged sidecar runs as "tarkov-server-x86_64-pc-windows-msvc",
+# which an exact-name match misses (and it then locks _internal during build).
+$leftover = Get-Process | Where-Object { $_.ProcessName -like "tarkov-server*" -or $_.ProcessName -eq "tarkov-price-overlay" }
+if ($leftover) {
+    $leftover | ForEach-Object {
+        Write-Host "[release] killing running $($_.ProcessName) (pid $($_.Id)) before build"
+        Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+    }
+    Start-Sleep -Seconds 2
+}
+Write-Host "[release] running full build (PyInstaller + Tauri NSIS)..."
+& "$root\scripts\build.ps1"
+
+$installer = "$root\src-tauri\target\release\bundle\nsis\Tarkov Price Overlay_${Version}_x64-setup.exe"
+if (-not (Test-Path $installer)) {
+    throw "Installer not found at $installer"
+}
+Write-Host "[release] installer ready: $installer"
+
+# Tauri 2 emits the .sig file alongside the installer when createUpdaterArtifacts=true
+# and TAURI_SIGNING_PRIVATE_KEY is set. The sig content (not a path) gets
+# embedded in latest.json so the in-app updater can verify the download.
+$installerSig = "$installer.sig"
+if (-not (Test-Path $installerSig)) {
+    throw "Installer signature not found at $installerSig — make sure TAURI_SIGNING_PRIVATE_KEY is set during build"
+}
+Write-Host "[release] installer signature ready: $installerSig"
+
+# 3b. Build portable ZIP from the same target/release artifacts
+Write-Host "[release] building portable ZIP..."
+& "$root\scripts\portable.ps1"
+$portableZip = "$root\src-tauri\target\release\portable\Tarkov Price Overlay_${Version}_portable.zip"
+if (-not (Test-Path $portableZip)) {
+    throw "Portable ZIP not found at $portableZip"
+}
+Write-Host "[release] portable zip ready: $portableZip"
+
+# 4. Push dev, merge to master, tag
+Write-Host "[release] pushing dev..."
+& git push origin dev
+
+Write-Host "[release] merging dev -> master..."
+& git checkout master
+& git merge --ff-only dev
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[release] fast-forward failed, doing merge commit"
+    & git merge --no-ff dev -m "Merge dev for release $tag"
+}
+& git tag -a $tag -m "Release $tag"
+& git push origin master --tags
+
+# 5a. Build latest.json — the manifest the in-app updater polls. GitHub's
+# /releases/latest/download/<asset> URL pattern redirects to whatever the
+# newest published release tagged. So we ship a fresh latest.json with
+# every release and the endpoint in tauri.conf.json always finds it.
+$sigContent = (Get-Content -Raw $installerSig).Trim()
+$installerUrl = "https://github.com/$publicRepo/releases/download/$tag/Tarkov.Price.Overlay_${Version}_x64-setup.exe"
+$pubDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+$latestJson = [ordered]@{
+    version   = $tag
+    notes     = $Notes
+    pub_date  = $pubDate
+    platforms = [ordered]@{
+        "windows-x86_64" = [ordered]@{
+            signature = $sigContent
+            url       = $installerUrl
+        }
+    }
+} | ConvertTo-Json -Depth 5
+$latestJsonPath = "$root\src-tauri\target\release\bundle\nsis\latest.json"
+# Write without BOM so GitHub serves clean UTF-8 (PowerShell 5.1 Out-File
+# adds a BOM by default which some HTTP clients choke on).
+[IO.File]::WriteAllText($latestJsonPath, $latestJson, [Text.UTF8Encoding]::new($false))
+Write-Host "[release] latest.json written: $latestJsonPath"
+
+# 5b. Create release on PUBLIC distribution repo (installer + portable ZIP + latest.json)
+Write-Host "[release] creating GitHub Release on $publicRepo..."
+# Pass notes via a file, NOT `--notes $Notes`: multi-line notes with quotes /
+# special chars got mangled when handed to gh as a native-command argument
+# (v1.1.2 release: "no matches found for `to`" — gh treated fragments as asset
+# globs and the release didn't get created). A file is parse-proof.
+$ghNotesFile = Join-Path $env:TEMP "ghrelease-notes-$tag.txt"
+[IO.File]::WriteAllText($ghNotesFile, $Notes, [Text.UTF8Encoding]::new($false))
+& $ghExe release create $tag $installer $portableZip $latestJsonPath `
+    --repo $publicRepo `
+    --title "Tarkov Price Overlay $tag" `
+    --notes-file $ghNotesFile
+
+# 5c. Verify the release actually exists with all three assets — `gh release
+# create` has silently failed before (v1.0.11). Catch it HERE, not days later.
+Write-Host "[release] verifying GitHub release..."
+# No 2>$null here: under Windows PowerShell 5.1 + ErrorActionPreference=Stop,
+# redirecting a native command's stderr wraps it in a terminating
+# NativeCommandError BEFORE $LASTEXITCODE is checked — the friendly throw
+# below became unreachable. stderr going to console is fine; $assets only
+# captures stdout either way.
+$assets = & $ghExe release view $tag --repo $publicRepo --json assets --jq ".assets[].name"
+if ($LASTEXITCODE -ne 0) {
+    throw "Release $tag NOT FOUND on $publicRepo — gh release create silently failed. Re-run: gh release create $tag <assets> --repo $publicRepo"
+}
+foreach ($needle in @("setup.exe", "portable.zip", "latest.json")) {
+    if (-not ($assets | Where-Object { $_ -like "*$needle*" })) {
+        throw "Release $tag is missing asset *$needle* (found: $($assets -join ', ')). Upload it: gh release upload $tag <file> --repo $publicRepo"
+    }
+}
+Write-Host "[release] verified: $(@($assets).Count) assets present."
+
+# 6. Back to dev
+& git checkout dev
+Write-Host ""
+Write-Host "[release] DONE."
+Write-Host "  Public release: https://github.com/$publicRepo/releases/tag/$tag"
+Write-Host "  Reminder: update project_status.md memory with the new release info."

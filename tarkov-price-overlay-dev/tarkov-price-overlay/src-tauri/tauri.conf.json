@@ -1,0 +1,105 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Tarkov Price Overlay",
+  "version": "1.2.4",
+  "identifier": "com.tarkov.overlay",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Tarkov Price Overlay",
+        "width": 800,
+        "height": 600,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": true,
+        "shadow": false
+      },
+      {
+        "label": "preview-primary",
+        "url": "index.html?window=preview-primary",
+        "title": "Capture region preview (primary)",
+        "width": 300,
+        "height": 70,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "visible": false,
+        "focus": false
+      },
+      {
+        "label": "preview-ground",
+        "url": "index.html?window=preview-ground",
+        "title": "Capture region preview (ground)",
+        "width": 160,
+        "height": 30,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "visible": false,
+        "focus": false
+      },
+      {
+        "label": "preview-anchor",
+        "url": "index.html?window=preview-anchor",
+        "title": "Capture region preview (anchor)",
+        "width": 24,
+        "height": 24,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "visible": false,
+        "focus": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "createUpdaterArtifacts": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "externalBin": ["binaries/tarkov-server"],
+    "resources": {
+      "binaries/_internal": "_internal"
+    },
+    "windows": {
+      "nsis": {
+        "installerHooks": "installer-hooks.nsh"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/pado8/tarkov-price-overlay-releases/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI0QTI0NTIzQkYyNjdFRUIKUldUcmZpYS9JMFdpSkJMcFJzcXBuMGVPdUMyZytaaFdBUUJjaEZpWXVpdHZXNjgxNnBKeUxVSHMK"
+    }
+  }
+}

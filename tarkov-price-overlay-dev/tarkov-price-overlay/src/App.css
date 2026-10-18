@@ -1,0 +1,1575 @@
+:root {
+  /* ── Typography ─────────────────────────────────────────────────────
+     Segoe UI handles Latin; Pretendard / 맑은 고딕 handle Hangul. Listing
+     both Korean fonts as fallbacks means modern installs (Pretendard) win
+     when present and Win11 default (맑은 고딕) covers the rest. */
+  font-family: "Segoe UI", "Pretendard", "맑은 고딕", system-ui, sans-serif;
+  font-size: 14px;
+  color: var(--text-primary);
+
+  /* ── Color tokens ───────────────────────────────────────────────────
+     Semantic greys (4 tiers) — replaces ad-hoc #fff/#ddd/#ccc/#aaa/#999/
+     #888/#666 sprinkled across the stylesheet. Values biased BRIGHTER
+     than typical dark-theme palettes because the overlay sits on top of
+     varied/bright game UI AND the user can drop the whole card to 20%
+     opacity. Each tier needs to survive both the transparent backdrop
+     and the opacity multiplier. */
+  --text-primary: #f0f0f0;
+  --text-secondary: #d0d0d0;
+  --text-muted: #b0b0b0;
+  --text-disabled: #888;
+
+  /* Gold accent (Tarkov brand) — three border opacities + two solid tones. */
+  --gold-text: #c8aa64;
+  --gold-bright: #f0c040;
+  --gold-light: #f0d28e;
+  --border-subtle: rgba(200, 170, 100, 0.2);
+  --border-default: rgba(200, 170, 100, 0.4);
+  --border-emphasis: rgba(200, 170, 100, 0.6);
+  --bg-gold-soft: rgba(200, 170, 100, 0.18);
+  --bg-gold-chip: rgba(200, 170, 100, 0.3);
+
+  /* Status colors — unified after auditing the 6+ ad-hoc shades. */
+  --success: #6fbf73;
+  --success-dim: #4caf50;
+  --warning: #ffb060;
+  --danger: #ff7060;
+
+  /* ── Layout tokens ──────────────────────────────────────────────────
+     4px spacing scale + 3-tier radius. Every padding/gap/border-radius
+     should reference one of these unless there's a very specific reason. */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  height: 100%;
+  overflow: hidden;
+}
+
+.overlay {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 12px;
+  box-sizing: border-box;
+  -webkit-user-select: none;
+  user-select: none;
+  /* Never scroll at the overlay level — if we did, the scrollbar would
+     remain visible after the card fades out (the card collapses to opacity 0
+     but layout space is unchanged). Scroll lives on .card so it disappears
+     together with the card. */
+  overflow: hidden;
+}
+
+/* Full-name hover label. Fixed-position (offset up-right of the cursor by the
+   inline left/top) so the cursor never covers it, and rendered as a sibling of
+   .card so .card's backdrop-filter containing block + overflow can't clip it. */
+.hover-fullname {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  max-width: 220px;
+  background: rgba(20, 22, 27, 0.97);
+  color: #f0e6d2;
+  border: 1px solid var(--border-emphasis, #4a4f5c);
+  border-radius: var(--radius-sm, 4px);
+  padding: 2px 7px;
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: normal;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Font size tiers (derived from --card-fs set via inline style) ── */
+.card {
+  --card-fs: 13px;
+  --card-fs-sm:  calc(var(--card-fs) * 0.85);  /* ≈11px at default */
+  --card-fs-xs:  calc(var(--card-fs) * 0.77);  /* ≈10px at default */
+  --card-fs-xxs: calc(var(--card-fs) * 0.69);  /* ≈9px  at default */
+  font-size: var(--card-fs);
+  /* --card-bg-alpha is set inline from the bgOpacity setting (0-1).
+     Background-only transparency: text/icons keep full opacity. */
+  background: rgba(20, 20, 20, var(--card-bg-alpha, 0.85));
+  border: 1px solid var(--border-emphasis);
+  border-radius: var(--radius-lg);
+  padding: 10px 14px;
+  /* width set via inline style */
+  box-sizing: border-box;
+  /* Containing block for the absolutely-positioned resize handle, which
+     pins to the card's *visible* bottom-right corner regardless of scroll
+     position or whether content fills the (possibly drag-enlarged) card. */
+  position: relative;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  /* Subtle dark text-shadow gives every label an outline so muted greys
+     stay legible when the user drops card opacity to 20-40% and bright
+     game UI bleeds through. Invisible on the dark card itself; pulls
+     weight only when the backdrop becomes light. */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  opacity: 1;
+  transition: opacity 0.25s ease-out;
+  /* Cap height to viewport so very tall content (long history, all detail
+     panels expanded at large font) scrolls inside the card rather than
+     spilling past the window. Scroll bar lives here so it disappears with
+     the card on auto-hide. */
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+}
+.card::-webkit-scrollbar {
+  width: 6px;
+}
+.card::-webkit-scrollbar-thumb {
+  background: var(--bg-gold-chip);
+  border-radius: var(--radius-sm);
+}
+.card::-webkit-scrollbar-track {
+  background: transparent;
+}
+/* Card width resize handle — drag horizontally to widen/narrow the card,
+   double-click to reset to auto. position:sticky keeps it pinned to the
+   card's bottom-right corner even when tall content scrolls inside the card.
+   The diagonal stripes read as a classic resize grip (◢). */
+.card-resize-handle {
+  /* Absolute (not sticky): the containing block is .card's padding box =
+     the scroll viewport, so the handle stays glued to the visible
+     bottom-right corner whether content scrolls OR the card is dragged
+     taller than its content (sticky failed the latter — no scroll, so it
+     fell back to flowing at the content's end instead of the card bottom). */
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  user-select: none;
+  z-index: 3;
+  border-radius: 0 0 var(--radius-lg) 0;
+  background: linear-gradient(
+    135deg,
+    transparent 0 48%,
+    rgba(200, 170, 100, 0.5) 48% 56%,
+    transparent 56% 70%,
+    rgba(200, 170, 100, 0.5) 70% 78%,
+    transparent 78%
+  );
+  transition: filter 0.15s;
+}
+.card-resize-handle:hover {
+  filter: brightness(1.5);
+}
+.card.card-hidden {
+  opacity: 0;
+  pointer-events: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: transparent;
+  box-shadow: none;
+  background: transparent;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid rgba(200, 170, 100, 0.3);
+  padding-bottom: 4px;
+  cursor: move;
+}
+
+.title {
+  font-weight: 600;
+  color: var(--gold-text);
+  font-size: var(--card-fs);
+}
+
+.hotkey {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(200, 170, 100, 0.2);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  font-size: var(--card-fs-sm);
+  line-height: 1;
+  color: var(--gold-text);
+}
+
+.hotkey-icon {
+  font-size: var(--card-fs-sm);
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  font-family: "Segoe UI Symbol", "Segoe UI", system-ui, sans-serif;
+}
+
+.hotkey-sep {
+  opacity: 0.7;
+  line-height: 1;
+}
+
+.hotkey-key {
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  line-height: 1;
+}
+
+.header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.header-actions .settings-btn {
+  margin-left: 0;
+}
+
+/* Inert 📌 badge shown in place of ✕ while the window is pinned.
+   .settings-btn.pinned-badge: must out-specificity the later .settings-btn
+   rule (cursor:pointer + gold hover) or the inert badge looks clickable. */
+.settings-btn.pinned-badge,
+.pinned-badge {
+  cursor: default;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+}
+.settings-btn.pinned-badge:hover {
+  background: transparent;
+  color: inherit;
+}
+/* While pinned the header can't drag the window — don't advertise it. */
+.card-pinned .header,
+.card-pinned .header .title,
+.card-pinned .header .hotkey {
+  cursor: default;
+}
+
+.hint {
+  color: var(--text-muted);
+  font-size: var(--card-fs-sm);
+  font-style: italic;
+}
+
+.loading-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.loading-hint .hint-sub {
+  width: 100%;
+  font-size: var(--card-fs-xs);
+  color: var(--text-disabled);
+  font-style: normal;
+  margin-top: 2px;
+}
+/* Animated dual-ring spinner. Gold tint matches the brand. The
+   conic-gradient + mask trick keeps the file tiny (no SVG asset). */
+.loading-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--border-default);
+  border-top-color: var(--gold-bright);
+  animation: spinner-rotate 0.8s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spinner-rotate {
+  to { transform: rotate(360deg); }
+}
+
+.error {
+  color: var(--danger);
+  font-size: var(--card-fs-sm);
+}
+
+.item-name {
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--text-primary);
+  word-break: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.3;
+  font-size: var(--card-fs);
+  cursor: help;
+}
+
+.prices {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.price {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--card-fs);
+}
+
+.label {
+  color: var(--text-muted);
+}
+
+.value {
+  color: var(--success-dim);
+  font-weight: 600;
+  font-family: "Consolas", monospace;
+}
+
+.sub-price {
+  font-size: var(--card-fs-sm);
+  opacity: 0.75;
+  margin-left: 8px;
+}
+.sub-value {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.trend {
+  font-size: var(--card-fs-xs);
+  font-weight: 600;
+  font-family: "Consolas", monospace;
+  margin-left: 4px;
+}
+
+.vendor-name {
+  color: var(--text-disabled);
+  font-size: var(--card-fs-xs);
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+.slot-price {
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px dashed rgba(200, 170, 100, 0.2);
+  font-size: var(--card-fs);
+  color: var(--text-secondary);
+}
+.slot-price strong {
+  color: var(--gold-bright);
+  font-family: "Consolas", monospace;
+}
+
+/* Loot tier letter badge sits next to ₽/slot. Five tiers, colored by
+   value: S(gold) / A(warm orange) / B(green) / C(trader gold) / D(grey). */
+.loot-tier {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  font-size: var(--card-fs-xs);
+  font-family: "Consolas", monospace;
+  font-weight: 700;
+  vertical-align: middle;
+  cursor: help;
+}
+.loot-tier-S {
+  background: rgba(240, 192, 64, 0.25);
+  color: var(--gold-bright);
+  border: 1px solid rgba(240, 192, 64, 0.6);
+}
+.loot-tier-A {
+  background: rgba(255, 153, 51, 0.22);
+  color: var(--warning);
+  border: 1px solid rgba(255, 153, 51, 0.5);
+}
+.loot-tier-B {
+  background: rgba(111, 191, 115, 0.2);
+  color: var(--success);
+  border: 1px solid rgba(111, 191, 115, 0.5);
+}
+.loot-tier-C {
+  background: var(--bg-gold-soft);
+  color: var(--gold-text);
+  border: 1px solid rgba(200, 170, 100, 0.45);
+}
+.loot-tier-D {
+  background: rgba(140, 140, 140, 0.15);
+  color: var(--text-muted);
+  border: 1px solid rgba(140, 140, 140, 0.4);
+}
+
+.weight-info {
+  color: var(--text-secondary);
+}
+.weight-per {
+  color: var(--text-muted);
+  font-size: var(--card-fs-xs);
+}
+
+.all-traders {
+  font-size: var(--card-fs-sm);
+  margin-top: 2px;
+}
+.all-traders > summary {
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 0;
+  user-select: none;
+  list-style: none;
+}
+.all-traders > summary::before {
+  content: "▸ ";
+  font-size: var(--card-fs-xs);
+  color: var(--gold-text);
+}
+.all-traders[open] > summary::before {
+  content: "▾ ";
+}
+.all-traders > summary:hover {
+  color: var(--gold-text);
+}
+.trader-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+  margin-left: 8px;
+  padding-left: 6px;
+  border-left: 1px solid rgba(200, 170, 100, 0.15);
+}
+
+/* Barter rows */
+.barter-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: var(--card-fs-sm);
+  padding: 3px 0;
+  border-top: 1px dotted rgba(200, 170, 100, 0.1);
+}
+.barter-row:first-child {
+  border-top: none;
+}
+.barter-trader {
+  color: var(--gold-text);
+  font-weight: 600;
+}
+.barter-level {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-size: var(--card-fs-xs);
+  font-family: "Consolas", monospace;
+}
+.barter-items {
+  color: var(--text-primary);
+  margin-left: 4px;
+  word-break: break-word;
+}
+.barter-plus {
+  color: var(--text-disabled);
+}
+.barter-item {
+  cursor: help;
+}
+/* Quest gate badge on a barter row. Red = quest not completed yet (the
+   barter is still locked for this player), green = completed/unlocked. */
+.barter-quest-lock {
+  color: var(--danger);
+  font-size: var(--card-fs-xs);
+  margin-left: 6px;
+  word-break: keep-all;
+}
+.barter-quest-lock.unlocked {
+  color: var(--success-dim);
+}
+/* Craft the user can't run yet (station level too low). Stays readable
+   and hoverable — just visually demoted, no pointer-events block. */
+.barter-row.craft-locked {
+  opacity: 0.5;
+}
+.craft-lock-badge {
+  color: var(--danger);
+  font-size: var(--card-fs-xs);
+  margin-left: 6px;
+  word-break: keep-all;
+}
+.barter-count {
+  color: var(--success-dim);
+  font-family: "Consolas", monospace;
+  font-size: var(--card-fs-xs);
+  margin-left: 2px;
+}
+
+/* Item icon + name row */
+.item-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.item-icon {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  object-fit: contain;
+}
+.item-row .item-name {
+  flex: 1;
+  margin-bottom: 0;
+  align-self: center;
+}
+/* Wiki shortcut next to the item name. Sized off the card font so it stays
+   proportional when the user scales the overlay, and kept visually quiet —
+   it sits beside the headline item name and must not compete with it. */
+.wiki-btn {
+  flex-shrink: 0;
+  align-self: center;
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: calc(var(--card-fs) * 0.9);
+  line-height: 1.2;
+  opacity: 0.65;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+.wiki-btn:hover {
+  opacity: 1;
+  border-color: var(--bg-gold-chip);
+}
+
+/* Quest warning panel */
+.quest-warning {
+  margin-top: 6px;
+  padding: 5px 8px;
+  background: rgba(220, 170, 60, 0.10);
+  border: 1px solid rgba(220, 170, 60, 0.35);
+  border-radius: var(--radius-sm);
+  font-size: var(--card-fs-sm);
+  color: var(--gold-light);
+}
+.quest-list {
+  margin-top: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.quest-row {
+  display: flex;
+  gap: 6px;
+  font-size: var(--card-fs-xs);
+  padding-left: 6px;
+  align-items: center;
+}
+.quest-trader {
+  color: var(--gold-text);
+  min-width: 60px;
+  font-weight: 600;
+}
+.quest-name {
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quest-count {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.quest-count-num {
+  color: var(--success-dim);
+  font-family: "Consolas", monospace;
+  font-weight: 600;
+}
+.quest-fir {
+  color: var(--warning);
+  font-size: var(--card-fs-xxs);
+  background: rgba(255, 100, 60, 0.15);
+  border: 1px solid rgba(255, 100, 60, 0.4);
+  border-radius: var(--radius-sm);
+  padding: 0 4px;
+  font-weight: 600;
+  cursor: help;
+  /* Keep the badge intact when its flex row runs out of width (quest rows
+     ellipsize the name; hideout rows ellipsize the station instead). */
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.quest-anyitem {
+  color: var(--text-muted);
+  font-size: var(--card-fs-xxs);
+  background: rgba(120, 120, 120, 0.15);
+  border: 1px solid rgba(120, 120, 120, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 0 4px;
+  cursor: help;
+}
+
+/* Quest sync — log-based player progress overlay */
+.quest-row.completed {
+  opacity: 0.45;
+}
+.quest-row.completed .quest-name {
+  text-decoration: line-through;
+  text-decoration-color: rgba(150, 150, 150, 0.6);
+}
+.quest-row.started .quest-trader {
+  /* Subtle highlight on quests the player has actively picked up. */
+  color: var(--gold-light);
+}
+.quest-status-icon {
+  font-size: var(--card-fs-xxs);
+  padding: 0 3px;
+  border-radius: var(--radius-sm);
+  cursor: help;
+  font-weight: 700;
+}
+.quest-status-icon.completed {
+  color: var(--success);
+  background: rgba(76, 175, 80, 0.15);
+  border: 1px solid rgba(76, 175, 80, 0.35);
+}
+.quest-status-icon.started {
+  color: var(--gold-light);
+  background: rgba(220, 170, 60, 0.15);
+  border: 1px solid rgba(220, 170, 60, 0.35);
+}
+.quest-completed-badge {
+  color: var(--success);
+  font-weight: 600;
+  font-size: var(--card-fs-xs);
+}
+
+/* Ammo matrix table: caliber-grouped rows of Pen/Dmg/Frag + AC1-6 dots */
+/* Container owns the grid tracks; rows use `subgrid` so every row sizes
+   columns from the SAME source — header and data values stay aligned
+   regardless of label width (한글 vs 영문) or user font-size changes. */
+.ammo-matrix {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto auto;
+  row-gap: 1px;
+  font-size: var(--card-fs-xs);
+  font-family: "Consolas", monospace;
+}
+.ammo-row {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  column-gap: 10px;
+  align-items: center;
+  padding: 2px 4px;
+}
+.ammo-row-head {
+  color: var(--text-muted);
+  border-bottom: 1px solid rgba(200, 170, 100, 0.2);
+  padding-bottom: 3px;
+  margin-bottom: 2px;
+}
+.ammo-row-current {
+  background: var(--bg-gold-soft);
+  border-radius: var(--radius-sm);
+}
+.ammo-name {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ammo-row-current .ammo-name {
+  color: var(--gold-bright);
+  font-weight: 700;
+}
+.ammo-pen, .ammo-dmg, .ammo-frag {
+  text-align: right;
+  color: var(--text-secondary);
+}
+.ammo-ac-head {
+  text-align: center;
+  color: var(--text-muted);
+}
+.ammo-ac {
+  display: inline-flex;
+  gap: 2px;
+}
+.ac-cell {
+  display: inline-block;
+  width: 11px;
+  text-align: center;
+  font-weight: 700;
+}
+.ac-pass { color: var(--success); }
+.ac-mid  { color: var(--gold-bright); }
+.ac-fail { color: var(--danger); }
+
+/* Hideout-need single-line row: "정수기 Lv2 ×3" */
+.hideout-need-row {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  font-size: var(--card-fs-xs);
+  padding-left: 6px;
+}
+.hideout-need-station {
+  color: var(--text-primary);
+  /* Long localized station names ("비트코인 채굴 시설") must ellipsize at
+     narrow card widths so the Lv/count/FiR-badge cluster never clips past
+     the card edge — same protection .quest-name has in quest rows. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hideout-need-level {
+  color: var(--gold-text);
+  font-family: "Consolas", monospace;
+  flex-shrink: 0;
+}
+.hideout-need-count {
+  color: var(--success);
+  font-family: "Consolas", monospace;
+  flex-shrink: 0;
+}
+
+/* Completed hideout station row */
+.hideout-need-row.done {
+  opacity: 0.3;
+}
+.hideout-need-row.done .hideout-need-station {
+  text-decoration: line-through;
+}
+
+/* Hideout level collapsible section */
+.hideout-level-details {
+  margin: 0;
+}
+.hideout-level-details > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+.hideout-level-details > summary::-webkit-details-marker {
+  display: none;
+}
+.hideout-level-summary::after {
+  content: " ▶";
+  font-size: 9px;
+  opacity: 0.5;
+  margin-left: 4px;
+}
+.hideout-level-details[open] .hideout-level-summary::after {
+  content: " ▼";
+}
+
+/* Hideout level settings grid */
+.hideout-level-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px 10px;
+  margin: 2px 0 4px;
+}
+.hideout-level-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--card-fs-xs);
+  min-width: 0;
+}
+.hideout-level-name {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  word-break: break-word;
+  color: var(--text-secondary);
+  line-height: 1.2;
+}
+.hideout-level-val {
+  font-size: var(--card-fs-xxs);
+  color: var(--text-dim);
+  min-width: 26px;
+  text-align: center;
+  font-family: "Consolas", monospace;
+}
+.hd-step-btn {
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  border-radius: 3px;
+  color: var(--text-secondary);
+  font-size: var(--card-fs-xs);
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  cursor: pointer;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.hd-step-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.hd-step-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+/* Quest sync settings panel rows */
+.settings-row-stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+.quest-path-row {
+  display: flex;
+  gap: 4px;
+}
+.quest-path-input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+  padding: 2px 6px;
+  font-size: var(--card-fs-xs);
+  font-family: "Consolas", monospace;
+  border-radius: var(--radius-sm);
+}
+.quest-sync-ok {
+  color: var(--success);
+  font-size: var(--card-fs-xs);
+  font-family: "Consolas", monospace;
+}
+.quest-sync-warn {
+  color: var(--danger);
+  font-size: var(--card-fs-xs);
+}
+.quest-total {
+  color: var(--gold-light);
+  font-weight: 400;
+  font-size: var(--card-fs-xs);
+}
+.quest-total strong {
+  color: var(--success-dim);
+  font-family: "Consolas", monospace;
+  font-size: var(--card-fs-sm);
+}
+
+/* History panel */
+.history-panel {
+  background: rgba(40, 40, 40, 0.6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 6px 8px;
+  margin: 6px 0;
+  font-size: var(--card-fs-sm);
+}
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.history-empty {
+  color: var(--text-disabled);
+  font-style: italic;
+  font-size: var(--card-fs-xs);
+  padding: 4px 0;
+}
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.history-list::-webkit-scrollbar {
+  width: 6px;
+}
+.history-list::-webkit-scrollbar-thumb {
+  background: var(--bg-gold-chip);
+  border-radius: var(--radius-sm);
+}
+.history-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.history-row {
+  display: flex;
+  justify-content: space-between;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-primary);
+  text-align: left;
+  padding: 3px 6px;
+  font-size: var(--card-fs-sm);
+  cursor: pointer;
+  font-family: inherit;
+  border-radius: var(--radius-sm);
+}
+.history-row:hover {
+  background: rgba(200, 170, 100, 0.1);
+  border-color: rgba(200, 170, 100, 0.3);
+}
+.history-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 6px;
+}
+.history-price {
+  color: var(--success-dim);
+  font-family: "Consolas", monospace;
+  font-weight: 600;
+}
+
+/* Update banner */
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(200, 170, 100, 0.12);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 5px 8px;
+  margin: 6px 0;
+  font-size: var(--card-fs-sm);
+  color: var(--gold-light);
+}
+.update-text {
+  flex: 1;
+  min-width: 0;
+}
+/* Keep the CTA + dismiss buttons on one line; let the (possibly long, e.g.
+   the portable hint in EN) text block wrap and take the remaining space
+   instead of squeezing the button into a 3-line stack. */
+.update-banner .reset-btn,
+.update-banner .settings-btn {
+  flex-shrink: 0;
+}
+.update-portable-hint {
+  color: var(--text-disabled);
+  font-size: var(--card-fs-xxs);
+  font-style: italic;
+}
+/* One-line release notes inside the update banner. */
+.update-notes {
+  color: var(--text-muted);
+  font-size: var(--card-fs-xs);
+}
+/* Visual download progress bar under the percent text. */
+.update-progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.update-progress-track {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.update-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--gold-light, #c8aa64);
+  transition: width 0.2s ease;
+}
+.update-btn {
+  background: rgba(200, 170, 100, 0.25);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.update-btn:hover {
+  background: var(--bg-gold-chip);
+}
+
+/* Admin elevation warning — same shape as .update-banner but warmer red
+   tone so users notice it's a "watch out" rather than a "you can update". */
+.admin-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 130, 100, 0.12);
+  border: 1px solid rgba(255, 130, 100, 0.45);
+  border-radius: var(--radius-md);
+  padding: 5px 8px;
+  margin: 6px 0;
+  font-size: var(--card-fs-xs);
+  color: var(--warning);
+}
+.admin-text {
+  flex: 1;
+  line-height: 1.35;
+}
+
+/* Anonymous-stats consent — first-launch banner asking user to opt in to
+   sending DAU + F2-lookup pings. Column layout (text on top, two buttons
+   below) because the body is longer than other banners and needs to wrap
+   cleanly. Violet tone to distinguish from update (gold), admin (red),
+   and announce (blue). */
+.consent-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(160, 130, 200, 0.12);
+  border: 1px solid rgba(160, 130, 200, 0.4);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  margin: 6px 0;
+  font-size: var(--card-fs-xs);
+  color: #c8b0e0;
+}
+.consent-opensource {
+  line-height: 1.4;
+  color: var(--gold-light);
+  font-weight: 600;
+}
+.consent-text {
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+.consent-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.consent-btn-accept {
+  background: rgba(160, 130, 200, 0.25);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.consent-btn-accept:hover {
+  background: rgba(160, 130, 200, 0.4);
+}
+
+/* Ad slot — settings panel top. Hosts CPMStar iframe when subpoolId is
+   set, otherwise renders the self-promo placeholder. Deliberately marked
+   with the "Ad" label so users immediately recognize what they're seeing
+   (Korean disclosure-rules friendly + transparent UX). */
+/* In-app feedback form — textarea + send, posts straight to the DB. */
+.feedback-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 4px 0 6px 0;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.feedback-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 56px;
+  max-height: 240px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--card-fs-sm);
+  line-height: 1.4;
+  padding: 5px 7px;
+}
+.feedback-textarea:focus {
+  outline: none;
+  border-color: var(--gold-text);
+}
+.feedback-textarea:disabled {
+  opacity: 0.6;
+}
+.feedback-attach-row {
+  display: flex;
+  align-items: center;
+  min-height: 20px;
+}
+.feedback-attach-label {
+  font-size: var(--card-fs-xs);
+  color: var(--gold-text);
+  cursor: pointer;
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+}
+.feedback-attach-label:hover {
+  background: rgba(200, 170, 100, 0.1);
+}
+.feedback-thumb {
+  position: relative;
+  display: inline-block;
+}
+.feedback-thumb img {
+  max-width: 100px;
+  max-height: 70px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  display: block;
+}
+.feedback-thumb-x {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  line-height: 14px;
+  text-align: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border-default);
+  background: rgba(20, 20, 20, 0.95);
+  color: var(--warning);
+  cursor: pointer;
+  font-size: 10px;
+}
+.feedback-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.feedback-status {
+  font-size: var(--card-fs-xs);
+  color: var(--text-muted);
+}
+.feedback-status.sent {
+  color: #6cc070;
+}
+.feedback-status.error {
+  color: var(--warning);
+}
+.feedback-send-btn {
+  margin-left: 0;
+  font-weight: 600;
+  background: rgba(200, 170, 100, 0.22);
+  color: var(--text-primary);
+}
+.feedback-send-btn:hover:not(:disabled) {
+  background: var(--bg-gold-chip);
+}
+.feedback-send-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* Secondary "or email" fallback — a plain text link, low emphasis. */
+.feedback-mail-link {
+  align-self: flex-end;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font-size: var(--card-fs-xxs);
+  color: var(--text-disabled);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.feedback-mail-link:hover {
+  color: var(--text-muted);
+}
+
+/* Donation nudge above the feedback/donate buttons in settings. Warm
+   gold tone, gentle — replaces the old ad slot. */
+/* Shown in place of the flea/trader rows when an item has no market price
+   at all (untradeable quest/keycard items) — so it reads as intentional,
+   not a lookup failure. */
+.no-market-note {
+  font-size: var(--card-fs-sm);
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 2px 0;
+}
+
+.support-note {
+  font-size: var(--card-fs-xs);
+  line-height: 1.4;
+  color: var(--gold-light);
+  background: rgba(200, 170, 100, 0.08);
+  border: 1px solid rgba(200, 170, 100, 0.22);
+  border-radius: var(--radius-md);
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  text-align: center;
+}
+
+/* Feature announcement — blue-teal tone, one-time dismiss per version. */
+.announce-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(80, 160, 220, 0.12);
+  border: 1px solid rgba(80, 160, 220, 0.4);
+  border-radius: var(--radius-md);
+  padding: 5px 8px;
+  margin: 6px 0;
+  font-size: var(--card-fs-xs);
+  color: #7ec8f0;
+}
+.announce-text {
+  flex: 1;
+  line-height: 1.35;
+}
+.settings-hint-inline {
+  font-size: var(--card-fs-xxs);
+  color: var(--text-disabled);
+  font-family: "Consolas", monospace;
+}
+.settings-section-header {
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(200, 170, 100, 0.15);
+  font-size: var(--card-fs-xs);
+  color: var(--gold-text);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.settings-btn,
+.reset-btn {
+  background: transparent;
+  border: 1px solid var(--border-default);
+  color: var(--gold-text);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  font-size: var(--card-fs-sm);
+  cursor: pointer;
+  margin-left: 4px;
+}
+.settings-btn:hover,
+.reset-btn:hover {
+  background: rgba(200, 170, 100, 0.15);
+}
+.exit-btn {
+  border-color: rgba(255, 100, 100, 0.5);
+  color: var(--danger);
+}
+.exit-btn:hover {
+  background: rgba(255, 80, 80, 0.2);
+  color: var(--danger);
+}
+
+.settings {
+  background: rgba(40, 40, 40, 0.6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md) 4px 0 0;
+  padding: 6px 8px;
+  margin: 6px 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* Scroll container. Default height; the card's bottom-right corner handle
+     resizes this panel vertically while settings are open (see
+     onResizeHandleDown's `inSettings` branch) and persists the height. */
+  height: 400px;
+  overflow-y: auto;
+}
+.settings::-webkit-scrollbar {
+  width: 6px;
+}
+.settings::-webkit-scrollbar-thumb {
+  background: var(--bg-gold-chip);
+  border-radius: var(--radius-sm);
+}
+.settings::-webkit-scrollbar-track {
+  background: transparent;
+}
+/* Visible horizontal drag handle below the settings panel. Three grip
+   lines + ns-resize cursor make it instantly readable as "drag me". */
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--card-fs-sm);
+}
+.settings-row label {
+  color: var(--text-muted);
+  font-family: "Consolas", monospace;
+}
+.settings-row input[type="number"],
+.settings-row input[type="checkbox"],
+.settings-row select {
+  width: 80px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+  padding: 1px 4px;
+  font-size: var(--card-fs-sm);
+  font-family: "Consolas", monospace;
+  border-radius: var(--radius-sm);
+}
+.hotkey-rec-btn {
+  width: 90px;
+  font-family: "Consolas", monospace;
+  margin-left: 0;
+}
+.settings-hint {
+  font-size: var(--card-fs-xs);
+  color: var(--text-disabled);
+  margin-top: 2px;
+  font-style: italic;
+}
+.settings-feedback-row {
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(200, 170, 100, 0.15);
+}
+.feedback-btn,
+.donate-btn {
+  margin-left: 0;
+  padding: 3px 10px;
+}
+.donate-btn {
+  border-color: rgba(255, 180, 100, 0.5);
+  color: var(--warning);
+}
+.donate-btn:hover {
+  background: rgba(255, 180, 100, 0.18);
+  color: var(--warning);
+}
+
+/* Copyright block at bottom of settings panel */
+.copyright {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(200, 170, 100, 0.2);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.copyright-line {
+  font-size: var(--card-fs-xxs);
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+.copyright-sub {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Font size control in settings */
+.font-size-select {
+  background: #1a1a1a;
+  color: var(--gold-text);
+  border: 1px solid #444;
+  border-radius: var(--radius-md);
+  padding: 2px 4px;
+  font-size: var(--card-fs-xs);
+  cursor: pointer;
+}
+
+/* Opacity: slider + click-to-edit number readout */
+.opacity-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.opacity-slider {
+  width: 90px;
+  accent-color: var(--gold-text);
+  cursor: pointer;
+}
+.opacity-readout {
+  color: var(--gold-text);
+  font-family: "Consolas", monospace;
+  font-size: var(--card-fs-xs);
+  min-width: 36px;
+  text-align: right;
+  cursor: pointer;
+  user-select: none;
+}
+.opacity-readout:hover {
+  color: var(--gold-bright);
+  text-decoration: underline;
+}
+.opacity-number {
+  width: 48px;
+  background: #1a1a1a;
+  color: var(--gold-text);
+  border: 1px solid #c8aa64;
+  border-radius: var(--radius-md);
+  padding: 2px 4px;
+  font-size: var(--card-fs-xs);
+  font-family: "Consolas", monospace;
+  text-align: right;
+}
+
+.donate-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 8px;
+  background: rgba(255, 180, 100, 0.06);
+  border: 1px solid rgba(255, 180, 100, 0.3);
+  border-radius: var(--radius-md);
+}
+.donate-tabs {
+  display: flex;
+  width: 100%;
+  gap: 0;
+  border-bottom: 1px solid rgba(255, 180, 100, 0.25);
+  margin-bottom: 2px;
+}
+.donate-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  font-size: var(--card-fs-sm);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.donate-tab:hover {
+  color: var(--warning);
+}
+.donate-tab.active {
+  color: var(--warning);
+  border-bottom-color: var(--warning);
+  font-weight: 600;
+}
+.donate-hint {
+  font-size: var(--card-fs-sm);
+  color: var(--warning);
+  text-align: center;
+}
+.donate-qr {
+  background: #ffffff;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  line-height: 0;
+}
+.donate-url {
+  font-family: "Consolas", monospace;
+  font-size: var(--card-fs-xs);
+  color: var(--text-secondary);
+  word-break: break-all;
+  text-align: center;
+  user-select: text;
+  cursor: text;
+}
+.donate-actions {
+  display: flex;
+  gap: 6px;
+}
+.donate-actions .reset-btn {
+  margin-left: 0;
+  padding: 2px 10px;
+}
+/* Capture-region modal — rendered inside .card so the region-based click-
+   through naturally captures pointer events while the rest of the overlay
+   stays transparent. The backdrop dims the underlying settings rows so the
+   modal visually owns the card while open. */
+.capture-modal-backdrop {
+  margin: 6px 0 0 0;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--border-emphasis);
+  border-radius: var(--radius-md);
+  padding: 6px;
+  /* Backdrop blur reinforces the "this is a focused modal" feel even when
+     the overall card opacity slider is high. Falls back gracefully on
+     browsers without backdrop-filter (just looks like a darker box). */
+  backdrop-filter: blur(2px);
+}
+.capture-modal {
+  background: rgba(28, 28, 28, 0.95);
+  border: 1px solid var(--gold-text);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.capture-modal::-webkit-scrollbar {
+  width: 6px;
+}
+.capture-modal::-webkit-scrollbar-thumb {
+  background: var(--bg-gold-chip);
+  border-radius: var(--radius-sm);
+}
+.capture-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-default);
+  padding-bottom: 4px;
+}
+.capture-modal-title {
+  color: var(--gold-text);
+  font-weight: 600;
+  font-size: calc(var(--card-fs) * 1.02);
+}
+.capture-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.capture-modal-section-title {
+  margin-top: 8px;
+  padding: 4px 0 2px 0;
+  font-weight: 600;
+  font-size: var(--card-fs-sm);
+  color: var(--gold-light);
+  border-bottom: 1px dashed var(--border-subtle);
+}
+.capture-modal-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+.capture-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border-subtle);
+}
+.capture-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  margin: 2px 0 4px 0;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: var(--card-fs-xs);
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+.capture-legend-row {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+.capture-legend-row > span:first-child {
+  flex: 0 0 auto;
+  line-height: 1.4;
+}
+.capture-legend-note {
+  margin-top: 2px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--border-subtle);
+  color: var(--text-muted);
+  font-style: italic;
+}

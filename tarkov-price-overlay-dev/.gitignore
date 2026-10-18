@@ -1,0 +1,51 @@
+# Claude memory & per-machine state
+.claude/settings.local.json
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+.claude/commands/
+.claude/launch.json
+
+# Local-only drafts (project-specific; subprojects can also have their own)
+/community-posts/
+
+# Root CLAUDE.md is local-only workspace instructions (covers private sibling
+# projects) — kept out of this public repo. Subproject CLAUDE.md files stay tracked.
+/CLAUDE.md
+
+# Logs at repo root only
+/*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Leftover build artifacts/caches at repo root from pre-reorganization layout.
+# Anchored with a leading slash so they only match at the monorepo root —
+# subprojects (e.g. tarkov-price-overlay/src-tauri/) have their own .gitignore
+# that controls their build artifacts.
+/node_modules/
+/dist/
+/dist-python/
+/build-python/
+/python-core/
+/src-tauri/
+
+# Sibling projects living under the same root but NOT part of this repo
+# (each is its own project / has its own .git). Keeps `git status` clean so
+# the release pipeline's clean-tree check isn't blocked by unrelated work.
+/Labyrinth/
+/aquapado-api/
+/Alpha-ant's-portfolio/
+/pado8.github.io/
+/auto-tapper/
+/ktx-calendar/
+/.vs/
+/.mcp.json
+/response.txt
+/tall.txt
+
+# sibling projects split out to their own private repos (2026-07-28)
+poe-simulator/
+poe-price-overlay/
+stream-game/
+메모장/

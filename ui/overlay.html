@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TT Overlay</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      background: transparent;
+      background-color: rgba(0, 0, 0, 0);
+      width: 100vw; height: 100vh;
+      overflow: hidden;
+      font-family: "Chakra Petch", "Bahnschrift", "Segoe UI", system-ui, sans-serif;
+      user-select: none;
+    }
+    body {
+      pointer-events: none;
+      display: block;
+    }
+    .hidden { display: none !important; }
+    /* L'attribut hidden est écrasé par .o-row { display:flex } (règle d'auteur
+       > feuille du navigateur) : sans ceci, les lignes Barter/Craft restent
+       affichées même quand le JS les marque comme masquées. */
+    [hidden] { display: none !important; }
+
+    .cursor-overlay {
+      position: relative;
+      width: 320px;
+      box-sizing: border-box;
+      background: rgba(26, 21, 24, 0.92);
+      border: 2px solid #ffd700;
+      border-radius: 6px;
+      color: #ffffff;
+      font-size: 13px;
+      line-height: 1.4;
+      overflow: hidden;
+      display: block;
+    }
+    .o-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 10px 6px;
+      border-bottom: 1px solid #55554c;
+      background: rgba(0, 0, 0, 0.25);
+    }
+    .o-icon {
+      width: 26px; height: 26px; flex-shrink: 0;
+      background: #55554c; border-radius: 3px;
+      background-size: contain; background-repeat: no-repeat; background-position: center;
+      border: 1px solid #55554c;
+    }
+    .o-name {
+      font-size: 13px; font-weight: 600; color: #ffffff;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      max-width: 246px; line-height: 1.2; margin: 0;
+    }
+    .o-name.placeholder { color: #a8a397; font-weight: 400; }
+    .o-body { padding: 6px 10px 8px; }
+    .o-row { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; }
+    .o-label { color: #a8a397; font-size: 12px; white-space: nowrap; }
+    .o-value {
+      font-weight: 600; color: #ffd700; font-size: 12px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px;
+    }
+    .o-value.dim { color: #cfc9bd; font-weight: 400; }
+  </style>
+</head>
+<body>
+  <div id="cursor-overlay" class="cursor-overlay hidden">
+    <div class="o-header">
+      <div id="overlay-icon" class="o-icon"></div>
+      <h3 id="overlay-name" class="o-name placeholder">Item…</h3>
+    </div>
+    <div class="o-body">
+      <div class="o-row">
+        <span class="o-label">Flea</span>
+        <span id="overlay-flea" class="o-value">—</span>
+      </div>
+      <div class="o-row">
+        <span id="overlay-trader-label" class="o-label">Vendeur</span>
+        <span id="overlay-trader" class="o-value">—</span>
+      </div>
+      <div class="o-row">
+        <span class="o-label">Slot</span>
+        <span id="overlay-slot" class="o-value">—</span>
+      </div>
+      <div class="o-row">
+        <span class="o-label">Quête</span>
+        <span id="overlay-quest" class="o-value dim">—</span>
+      </div>
+      <div class="o-row" id="overlay-barter-row" hidden>
+        <span id="overlay-barter-label" class="o-label">Barter</span>
+        <span id="overlay-barter-value" class="o-value dim">—</span>
+      </div>
+      <div class="o-row" id="overlay-craft-row" hidden>
+        <span id="overlay-craft-label" class="o-label">Craft</span>
+        <span id="overlay-craft-value" class="o-value dim">—</span>
+      </div>
+      <div class="o-row" id="overlay-raw-row">
+        <span class="o-label">Lu</span>
+        <span id="overlay-raw" class="o-value dim">—</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  "use strict";
+  const invoke = window.__TAURI__ ? window.__TAURI__.core.invoke : null;
+  const $ = (id) => document.getElementById(id);
+  let isVisible = false;
+  let lastSeq = 0;
+  let hideTimer = null;
+
+  function fitWindow() {
+    if (!invoke) return;
+    requestAnimationFrame(() => {
+      const r = $("cursor-overlay").getBoundingClientRect();
+      invoke("set_overlay_size", { width: Math.ceil(r.width) + 2, height: Math.ceil(r.height) + 2 }).catch(() => {});
+    });
+  }
+  function show() {
+    isVisible = true;
+    $("cursor-overlay").classList.remove("hidden");
+    // set_size réaffiche la fenêtre côté Windows : c'est voulu ici, la carte
+    // est en train d'apparaître. On ne l'appelle donc jamais depuis hide().
+    // Indispensable aussi quand le contenu change de hauteur (barter/craft),
+    // sinon la carte serait coupée par une fenêtre trop petite.
+    fitWindow();
+  }
+  function hide() {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    if (isVisible) {
+      isVisible = false;
+      $("cursor-overlay").classList.add("hidden");
+      if (invoke) invoke("hide_overlay").catch(() => {});
+    }
+  }
+  function forceHide() {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    isVisible = false;
+    $("cursor-overlay").classList.add("hidden");
+    if (invoke) invoke("hide_overlay").catch(() => {});
+  }
+  function formatPrice(p) { return (p == null || p === 0) ? "—" : new Intl.NumberFormat(navigator.language || "fr-FR").format(p) + " ₽"; }
+  function formatSlot(p, w) { const wt = w || 1; return (p == null || !wt) ? "—" : new Intl.NumberFormat(navigator.language || "fr-FR").format(Math.floor(p / wt)) + " ₽"; }
+  function truncate(s, n) { return s && s.length > n ? s.substring(0, n) + "…" : s; }
+
+  function showLoading() {
+    $("overlay-name").textContent = "Lecture…";
+    $("overlay-name").classList.add("placeholder");
+    $("overlay-icon").style.backgroundImage = "";
+    $("overlay-flea").textContent = $("overlay-trader").textContent = $("overlay-slot").textContent = $("overlay-quest").textContent = "—";
+    $("overlay-raw").textContent = "—";
+    $("overlay-barter-row").hidden = true; $("overlay-craft-row").hidden = true;
+    show();
+    fitWindow();
+  }
+
+  function renderResult(d) {
+    d = d || {};
+    const n = d.item_name || (d.raw_text ? d.raw_text.trim() : "");
+    $("overlay-name").textContent = n ? truncate(n, 30) : ((d.raw_text || "").trim() || "Rien reconnu");
+    $("overlay-name").classList.toggle("placeholder", !n && !d.raw_text);
+    $("overlay-flea").textContent = formatPrice(d.flea_price);
+    $("overlay-trader").textContent = formatPrice(d.trader_price);
+    $("overlay-trader-label").textContent = d.trader_price != null ? "Vendeur" : "Base";
+    $("overlay-slot").textContent = formatSlot(d.flea_price, (d.width || 1) * (d.height || 1));
+
+    let q = "—";
+    if (Array.isArray(d.used_in_tasks) && d.used_in_tasks.length > 0) q = d.used_in_tasks.map(t => t && t.name).filter(Boolean).join(", ");
+    $("overlay-quest").textContent = truncate(q, 34);
+
+    if (Array.isArray(d.barters_for) && d.barters_for.length > 0) {
+      const b = d.barters_for[0] || {};
+      $("overlay-barter-label").textContent = b.trader || "Barter";
+      $("overlay-barter-value").textContent = "Niv. " + b.level + " : " + (b.items||[]).map(i=>i.count+"× "+i.name).join(" + ");
+      $("overlay-barter-row").hidden = false;
+    } else { $("overlay-barter-row").hidden = true; }
+
+    if (Array.isArray(d.needed_for_hideout) && d.needed_for_hideout.length > 0) {
+      const h = d.needed_for_hideout[0] || {};
+      $("overlay-craft-label").textContent = h.station || "Planque";
+      $("overlay-craft-value").textContent = "Niv. " + h.level + " : " + h.count + "×";
+      $("overlay-craft-row").hidden = false;
+    } else { $("overlay-craft-row").hidden = true; }
+
+    $("overlay-icon").style.backgroundImage = d.icon ? "url(\"" + d.icon + "\")" : "";
+    $("overlay-raw").textContent = truncate((d.raw_text || "").trim() || "—", 44);
+    show();
+    fitWindow();
+  }
+
+  function showError(msg, secs) {
+    $("overlay-name").textContent = truncate(msg || "Erreur de lecture", 30);
+    $("overlay-name").classList.remove("placeholder");
+    $("overlay-icon").style.backgroundImage = "";
+    $("overlay-flea").textContent = $("overlay-trader").textContent = $("overlay-slot").textContent = $("overlay-quest").textContent = "—";
+    $("overlay-raw").textContent = "—";
+    $("overlay-barter-row").hidden = true; $("overlay-craft-row").hidden = true;
+    show();
+    fitWindow();
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    if ((secs || 8) > 0) hideTimer = setTimeout(hide, (secs || 8) * 1000);
+  }
+
+  async function poll() {
+    if (!invoke) return;
+    try {
+      const data = await invoke("get_overlay_data");
+      if (!data) return;
+      // Le backend incrémente `seq` à CHAQUE nouvelle capture : un payload déjà
+      // traité (même statut, même résultat) a le même seq et est ignoré. C'est
+      // ce qui supprime le spam sans jamais bloquer les captures suivantes.
+      const seq = data.seq || 0;
+      if (seq <= lastSeq) return;
+      lastSeq = seq;
+
+      const status = data.status || "";
+      if (status === "loading") {
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        showLoading();
+      } else if (status === "ok") {
+        renderResult(data.result);
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        const secs = data.autohide || 8;
+        if (secs > 0) hideTimer = setTimeout(hide, secs * 1000);
+      } else if (status === "show") {
+        show();
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        const secs = data.autohide || 0;
+        if (secs > 0) hideTimer = setTimeout(hide, secs * 1000);
+      } else if (status === "error") {
+        showError(data.message || "Erreur de lecture", data.autohide);
+      } else if (status === "not-in-game") {
+        showError("Lance Tarkov d'abord", data.autohide || 4);
+      }
+    } catch(e) {}
+  }
+
+  setInterval(poll, 200);
+  // Au chargement, la carte est masquée par défaut : on cache aussi la fenêtre
+  // OS. Ne PAS appeler fitWindow() ici — set_size réafficherait la fenêtre et
+  // laisserait un rectangle vide à l'écran.
+  forceHide();
+  </script>
+</body>
+</html>

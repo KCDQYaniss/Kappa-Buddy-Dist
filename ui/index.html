@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tarkov Tracker</title>
+  <link rel="stylesheet" href="vendor/leaflet.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Update bar -->
+<div id="update-bar" class="update-bar" hidden>
+  <div class="ub-content">
+    <div class="ub-header">
+      <b id="update-title" class="ub-title"></b>
+      <span class="ub-version" id="update-version"></span>
+    </div>
+    <div id="update-notes" class="ub-notes"></div>
+  </div>
+  <div class="ub-actions">
+    <button id="update-install" class="btn sm primary" type="button" data-i18n="upd.install">Installer et redémarrer</button>
+    <button id="update-manual" class="btn sm" type="button" data-i18n="upd.manual" hidden>Télécharger à la main</button>
+    <button id="update-later" class="btn sm" type="button" data-i18n="upd.later">Plus tard</button>
+  </div>
+</div>
+  <div id="app">
+    <main>
+      <!-- CARTE -->
+      <section id="view-map" class="view map-view">
+        <aside id="map-side" class="side" aria-label="Calques et filtres"></aside>
+        <div class="map-wrap">
+          <div id="map" aria-label="Carte"></div>
+          <div class="map-bar">
+            <select id="map-select" aria-label="Map"></select>
+            <div id="floor-bar" class="floorbar" role="group" aria-label="Étage" hidden></div>
+            <button id="map-source" class="chip" type="button" hidden></button>
+            <span class="spacer"></span>
+            <button id="center-btn" class="btn sm" type="button" data-i18n="map.center">Centrer sur moi</button>
+            <button id="map-bright-btn" class="btn sm toggle" type="button" aria-pressed="false" data-i18n-title="map.bright.tip" title="Éclaircit l'image de carte (les cartes sont sombres)"><i></i><span data-i18n="map.bright">Carte éclaircie</span></button>
+            <button id="follow-btn" class="btn sm toggle" type="button" aria-pressed="true" data-i18n-title="map.follow.tip" title="Recentre la carte sur ta position à chaque capture d'écran"><i></i><span data-i18n="map.follow.on">Suivi : activé</span></button>
+          </div>
+          <section id="empty" class="empty" hidden>
+            <h1 data-i18n="map.empty.title">Pas encore de position</h1>
+            <p id="empty-text"></p>
+          </section>
+          <footer id="readout" class="readout" hidden><span id="r-time"></span><span id="r-xyz"></span></footer>
+        </div>
+      </section>
+
+      <!-- QUÊTES -->
+      <section id="view-quests" class="view quests-view" hidden>
+        <div id="q-sync" class="syncbar"></div>
+        <div id="q-traders" class="subtabs" role="tablist"></div>
+        <div class="filters">
+          <div id="q-states" class="chips" role="group" aria-label="Statut"></div>
+          <input id="q-search" class="txt" type="search" data-i18n-ph="q.search" placeholder="Rechercher une quête…" spellcheck="false">
+          <select id="q-map" aria-label="Map"></select>
+          <label class="chk"><input id="q-kappa" type="checkbox"><span data-i18n="q.kappa">Kappa</span></label>
+          <label class="lvl" data-i18n-title="q.level.tip" title="Ton niveau : les quêtes trop avancées passent en « verrouillées »"><span data-i18n="q.level">Niveau</span><input id="q-level" class="txt num" type="number" min="1" max="79" placeholder="—"></label>
+          <span class="spacer"></span>
+          <button id="q-catchup" class="btn sm" type="button" data-i18n-title="cu.hint" data-i18n="cu.open">Rattrapage</button>
+          <span id="q-count" class="dim"></span>
+        </div>
+        <div id="q-list" class="qlist"></div>
+        <article id="q-detail" class="detail"></article>
+      </section>
+
+      <!-- OBJETS -->
+      <section id="view-items" class="view items-view" hidden>
+        <div class="filters">
+          <input id="i-search" class="txt" type="search" data-i18n-ph="i.search" placeholder="Rechercher un objet…" spellcheck="false">
+          <select id="i-cat" aria-label="Catégorie"></select>
+          <select id="i-sort" aria-label="Tri"><option value="name" data-i18n="i.sort.name">Tri : nom</option><option value="price" data-i18n="i.sort.price">Tri : prix</option></select>
+          <label class="chk"><input id="i-needed" type="checkbox"><span data-i18n="i.needed">Utiles à mes quêtes en cours</span></label>
+          <label class="chk"><input id="i-hideout" type="checkbox"><span data-i18n="i.hideout">Utiles au hideout</span></label>
+          <span class="spacer"></span><span id="i-count" class="dim"></span>
+        </div>
+        <div id="i-scroll" class="iscroll"><div id="i-spacer"></div><div id="i-rows"></div></div>
+        <article id="i-detail" class="detail"></article>
+      </section>
+
+      <!-- HIDEOUT -->
+      <section id="view-hideout" class="view hideout-view" hidden>
+        <div class="filters">
+          <input id="h-search" class="txt" type="search" data-i18n-ph="h.search" placeholder="Rechercher une station…" spellcheck="false">
+          <label class="chk"><input id="h-missing" type="checkbox"><span data-i18n="h.onlyMissing">Manquants seulement</span></label>
+          <label class="chk"><input id="h-fir" type="checkbox"><span data-i18n="h.ignoreFir">Ignorer FIR</span></label>
+          <span class="spacer"></span><span id="h-count" class="dim"></span>
+        </div>
+        <div id="h-list" class="qlist"></div>
+        <article id="h-detail" class="detail"></article>
+      </section>
+    </main>
+    <nav class="bottombar" aria-label="Navigation">
+      <div class="tabs" role="tablist">
+        <button role="tab" data-view="map" aria-selected="true" type="button" data-i18n-title="nav.map.tip" title="Touche 1">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5l6-2.2 6 2.2 6-2.2v15.2l-6 2.2-6-2.2-6 2.2zM9 3.3v15.2M15 5.5v15.2"/></svg><span data-i18n="nav.map">Carte</span>
+        </button>
+        <button role="tab" data-view="quests" aria-selected="false" type="button" data-i18n-title="nav.quests.tip" title="Touche 2">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v17H6zM9 2.5h6V6H9zM9 10h6M9 13.5h6M9 17h4"/></svg><span data-i18n="nav.quests">Quêtes</span>
+          <b id="badge-q" class="badge lime" hidden></b>
+        </button>
+        <button role="tab" data-view="items" aria-selected="false" type="button" data-i18n-title="nav.items.tip" title="Touche 3">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5zM3 7.5l9 4.5 9-4.5M12 12v9"/></svg><span data-i18n="nav.items">Objets</span>
+          <b id="badge-i" class="badge grey" hidden></b>
+        </button>
+        <button role="tab" data-view="hideout" aria-selected="false" type="button" data-i18n-title="nav.hideout.tip" title="Touche 4">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11L12 3.5 20.5 11M5.5 9.5V20h13V9.5M10 20v-5.5h4V20"/></svg><span data-i18n="nav.hideout">Hideout</span>
+          <b id="badge-h" class="badge lime" hidden></b>
+        </button>
+      </div>
+      <div class="bar-right">
+        <span id="sync-note" class="dim"></span>
+        <span id="data-status" class="dim"></span>
+        <button id="ontop-btn" class="iconbtn toggle" type="button" aria-pressed="false" data-i18n-title="nav.ontop" title="Fenêtre toujours au premier plan (utile pendant un raid)" aria-label="Toujours au premier plan">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5z"/></svg>
+        </button>
+        <button id="refresh-btn" class="iconbtn" type="button" data-i18n-title="nav.refresh" title="Actualiser les données du jeu" aria-label="Actualiser les données">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.4-5.7M20 4v5h-5"/></svg>
+        </button>
+        <button id="settings-btn" class="iconbtn" type="button" data-i18n-title="nav.settings" title="Réglages et diagnostic" aria-label="Réglages">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/></svg>
+        </button>
+        <button id="mode-badge" class="mode-badge" type="button" data-i18n-title="nav.mode" title="Mode de jeu — clique pour changer">PvP</button>
+      </div>
+    </nav>
+  </div>
+
+  <div id="lookup" class="lookup" hidden>
+    <div class="lookup-head">
+      <input id="lookup-q" class="txt" type="search" data-i18n-ph="look.ph" placeholder="Chercher un objet · prix, quêtes, loot…" autocomplete="off" spellcheck="false">
+      <button id="lookup-close" class="iconbtn" type="button" data-i18n-aria="look.close" aria-label="Fermer">×</button>
+    </div>
+    <ul id="lookup-res" class="lookup-res" hidden></ul>
+    <div id="lookup-card" class="lookup-card" hidden></div>
+  </div>
+
+  <ul id="warnings" class="warnings" aria-live="polite"></ul>
+
+  <dialog id="settings">
+    <form method="dialog" id="settings-form">
+      <h2 data-i18n="set.title">Réglages</h2>
+      <label><span data-i18n="set.shots">Dossier des captures d'écran</span>
+        <input id="s-shots" class="txt" type="text" spellcheck="false" placeholder="Documents\Escape From Tarkov\Screenshots">
+      </label>
+      <label><span data-i18n="set.logs">Dossier des logs du jeu</span>
+        <input id="s-logs" class="txt" type="text" spellcheck="false" data-i18n-ph="set.logs.ph" placeholder="Détecté automatiquement">
+      </label>
+      <label><span data-i18n="set.lang">Langue de l'application</span>
+        <select id="s-lang"><option value="fr">Français</option><option value="en">English</option><option value="de">Deutsch</option><option value="es">Español</option><option value="ru">Русский</option></select>
+      </label>
+      <label><span data-i18n="set.theme">Thème</span>
+        <select id="s-theme">
+          <option value="dark" data-i18n="set.theme.dark">Sombre (Tarkov)</option>
+          <option value="light" data-i18n="set.theme.light">Clair</option>
+          <option value="cyberpunk" data-i18n="set.theme.cyberpunk">Cyberpunk</option>
+        </select>
+      </label>
+      <label><span data-i18n="set.mode">Mode de jeu</span>
+        <select id="s-mode">
+          <option value="PvP" data-i18n="set.mode.pvp">PvP (classique)</option>
+          <option value="PvE" data-i18n="set.mode.pve">PvE (solo/coop)</option>
+          <option value="Season" data-i18n="set.mode.season">Saison</option>
+        </select>
+      </label>
+      <label class="chk"><input id="s-delete" type="checkbox"><span data-i18n="set.delete">Supprimer chaque capture après lecture de la position</span></label>
+      <label class="chk"><input id="s-autostart" type="checkbox"><span data-i18n="set.autostart">Démarrer avec Windows</span></label>
+      <label class="chk"><input id="s-totray" type="checkbox"><span data-i18n="set.totray">Réduire dans la zone de notification à la fermeture</span></label>
+      <label class="chk"><input id="s-startmin" type="checkbox"><span data-i18n="set.startmin">Démarrer réduit (dans la zone de notification)</span></label>
+      <label class="chk"><input id="s-ontop" type="checkbox"><span data-i18n="set.ontop">Fenêtre toujours au premier plan</span></label>
+      <label class="chk"><input id="s-cursor-overlay" type="checkbox"><span data-i18n="set.cursorOverlay">Overlay prix dans le jeu</span></label>
+      </label>
+      <label class="chk"><span data-i18n="set.captureHotkey">Raccourci lecture (F2)</span>
+        <input id="s-capture-hotkey" class="txt sm" type="text" placeholder="F2">
+      </label>
+      <label class="chk"><span data-i18n="set.toggleHotkey">Raccourci affichage</span>
+        <input id="s-toggle-hotkey" class="txt sm" type="text" placeholder="Shift+F2">
+      </label>
+      <label><span data-i18n="set.gameLang">Langue du jeu (OCR)</span>
+        <select id="s-game-lang">
+          <option value="en">English</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+          <option value="es">Español</option>
+          <option value="ru">Русский</option>
+        </select>
+      </label>
+      <label><span data-i18n="set.autohide">Masquer après (s)</span>
+        <input id="s-autohide" class="txt sm" type="number" min="0" max="300" value="8">
+        <span class="hint" data-i18n="set.autohideHint">0 = reste affichée</span>
+      </label>
+      <p class="hint" id="s-hint"></p>
+      <div class="row ub-row">
+        <label class="chk"><input id="s-updates" type="checkbox"><span data-i18n="set.updates">Vérifier les mises à jour au démarrage</span></label>
+        <span class="spacer"></span>
+        <button id="s-check-now" class="btn sm" type="button" data-i18n="set.checkNow">Vérifier maintenant</button>
+        <button id="s-tour" class="btn sm" type="button" data-i18n="set.tour">Revoir le tutoriel</button>
+      </div>
+      <details id="diag" class="diag">
+        <summary data-i18n="diag.title">Diagnostic (débogage)</summary>
+        <div class="body">
+          <p class="hint" data-i18n="diag.hint">À lancer si quelque chose ne marche pas.</p>
+          <div class="row">
+            <button id="diag-run" class="btn sm primary" type="button" data-i18n="diag.run">Analyser</button>
+            <button id="diag-copy" class="btn sm" type="button" data-i18n="diag.copy">Copier le rapport</button>
+          </div>
+          <div id="diag-out" class="diag-out"><p class="dim" data-i18n="diag.notRun">Pas encore lancé.</p></div>
+        </div>
+      </details>
+      <div class="actions">
+        <button class="btn" value="cancel" type="submit" data-i18n="set.cancel">Annuler</button>
+        <button id="s-save" class="btn primary" value="save" type="submit" data-i18n="set.save">Enregistrer</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="catchup" class="catchup">
+    <h2 data-i18n="cu.title">Rattrapage des quêtes</h2>
+    <p class="hint" data-i18n="cu.hint">Coche les quêtes que tu as déjà terminées.</p>
+    <div class="filters">
+      <input id="cu-search" class="txt" type="search" data-i18n-ph="cu.search" placeholder="Rechercher une quête…" spellcheck="false">
+      <select id="cu-state">
+        <option value="notdone" data-i18n="cu.filter.notdone">Pas encore terminées</option>
+        <option value="locked" data-i18n="cu.filter.locked">Verrouillées</option>
+        <option value="started" data-i18n="cu.state.started">En cours</option>
+        <option value="failed" data-i18n="cu.state.failed">Échouées</option>
+        <option value="finished" data-i18n="cu.state.finished">Terminées</option>
+        <option value="all" data-i18n="cu.filter.all">Toutes</option>
+      </select>
+      <span class="spacer"></span><span id="cu-count" class="dim"></span>
+    </div>
+    <div id="cu-list" class="culist"></div>
+    <div id="cu-ocr" class="cuocr" hidden>
+      <p class="hint" data-i18n="cu.ocr.hint">Prends une capture d'écran des quêtes dans le jeu (touche Impr. écran).
+        L'applique lit automatiquement les noms et te propose de les marquer terminés.</p>
+      <div class="ocr-main">
+        <button id="cu-ocr-btn" class="btn primary" type="button" data-i18n="cu.ocr.read">Lire la dernière capture</button>
+        <span class="ocr-or">— ou —</span>
+        <button id="cu-ocr-pick" class="btn" type="button" data-i18n="cu.ocr.openFile">Choisir une capture</button>
+      </div>
+      <div id="cu-ocr-picker" class="ocr-picker" hidden>
+        <label class="ocr-label" data-i18n="cu.ocr.file">Capture :</label>
+        <select id="cu-ocr-file"></select>
+      </div>
+      <p id="cu-ocr-status" class="dim"></p>
+      <div id="cu-ocr-results" class="culist"></div>
+      <div class="actions">
+        <button id="cu-ocr-apply" class="btn primary" type="button" data-i18n="cu.ocr.apply" disabled>Marquer les quêtes cochées</button>
+        <button id="cu-ocr-cancel" class="btn sm" type="button" data-i18n="cu.cancel">Annuler</button>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="cu-ocr-open" class="btn sm" type="button" data-i18n="cu.ocr.open">Lire une capture d'écran</button>
+      <span class="spacer"></span>
+      <span id="cu-summary" class="dim"></span>
+      <button id="cu-close" class="btn primary" type="button" data-i18n="cu.done">Terminer</button>
+    </div>
+  </dialog>
+
+  <!-- Cursor Overlay - affiche les prix des items survolés dans le jeu -->
+  <div id="cursor-overlay" class="cursor-overlay" hidden>
+    <div class="overlay-header">
+      <div id="overlay-icon" class="overlay-icon"></div>
+      <h3 id="overlay-name" class="overlay-name">…</h3>
+    </div>
+    <div class="overlay-body">
+      <div id="overlay-flea" class="overlay-row">
+        <span class="overlay-label">Flea</span>
+        <span class="overlay-value price-flea">—</span>
+      </div>
+      <div id="overlay-trader" class="overlay-row">
+        <span class="overlay-label" id="overlay-trader-label">Vendeur</span>
+        <span class="overlay-value price-trader">—</span>
+      </div>
+      <div class="overlay-row">
+        <span class="overlay-label">Base</span>
+        <span class="overlay-value">—</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="i18n.js"></script>
+  <script src="theme.js"></script>
+  <script src="vendor/leaflet.js"></script>
+  <script src="geo.js"></script>
+  <script src="store.js"></script>
+  <script src="mapview.js"></script>
+  <script src="quests.js"></script>
+  <script src="items.js"></script>
+  <script src="hideout.js"></script>
+  <script src="catchup.js"></script>
+  <script src="tour.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

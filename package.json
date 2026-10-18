@@ -1,0 +1,21 @@
+{
+  "name": "tarkov-tracker",
+  "version": "0.8.22",
+  "private": true,
+  "scripts": {
+    "maps": "python3 tools/prepare_maps.py || python tools/prepare_maps.py",
+    "dev": "tauri dev",
+    "build": "node tools/build.js",
+    "package": "node tools/audit.js && node tools/build.js",
+    "release": "node tools/release.js",
+    "publish": "node tools/publish.js",
+    "verify-release": "node tools/verify-published.js",
+    "zip": "node tools/zip.js",
+    "audit": "node tools/audit.js",
+    "test": "cargo test -p tarkov-core && node tests/release.test.js && node tests/geo.test.js && node tests/maps.test.js && node tests/ui.test.js && node tests/cp.test.js && node tests/outage.test.js && node tests/sync.test.js"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "jsdom": "^24"
+  }
+}
