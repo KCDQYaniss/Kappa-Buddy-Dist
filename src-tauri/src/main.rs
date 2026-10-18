@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod data;
+mod debug;
 mod ocr;
 mod overlay;
 mod priority;
@@ -121,6 +122,7 @@ struct AppState {
 struct HotkeySlots {
     capture: Option<Shortcut>,
     toggle: Option<Shortcut>,
+    debug: Option<Shortcut>,
 }
 struct Hotkeys(Mutex<HotkeySlots>);
 
@@ -144,6 +146,17 @@ fn apply_overlay_hotkeys(app: &AppHandle, capture: &str, toggle: &str) -> Result
     }
     if let Some(old) = cfg.toggle.take() {
         let _ = gs.unregister(old);
+    }
+    if let Some(old) = cfg.debug.take() {
+        let _ = gs.unregister(old);
+    }
+
+    // Debug hotkey: fixed F3, dumps the capture boxes as BMPs and flashes the
+    // on-screen frame. Always registered when the overlay feature is on.
+    if let Ok(parsed) = "F3".parse::<Shortcut>() {
+        if gs.register(parsed.clone()).is_ok() {
+            cfg.debug = Some(parsed);
+        }
     }
 
     if !capture.trim().is_empty() {
@@ -199,6 +212,8 @@ async fn run_overlay_capture(app: &AppHandle) {
 
     if !overlay::is_tarkov_foreground() {
         println!("[overlay] capture ignorée : Tarkov n'est pas au premier plan");
+        // Cache avant d'afficher le message "not-in-game"
+        let _ = overlay::hide_overlay_window(app);
         let _ = overlay::show_overlay_window(app);
         store_overlay(serde_json::json!({
             "status": "not-in-game",
@@ -207,6 +222,8 @@ async fn run_overlay_capture(app: &AppHandle) {
         return;
     }
 
+    // Cache avant de montrer - évite les doubles fenêtres ou résidus visuels
+    let _ = overlay::hide_overlay_window(app);
     let _ = overlay::show_overlay_window(app);
     store_overlay(serde_json::json!({ "status": "loading" }));
 
@@ -237,6 +254,30 @@ fn spawn_overlay_capture(app: &AppHandle) {
     tauri::async_runtime::spawn(async move {
         run_overlay_capture(&handle).await;
     });
+}
+
+/// Debug OCR (F3) : dump BMP des zones envoyées au sidecar + cadre rouge à
+/// l'écran autour de la zone principale. Ne déclenche PAS de lecture OCR —
+/// le cadre ne peut donc pas polluer la capture.
+fn spawn_overlay_debug(_app: &AppHandle) {
+    #[cfg(windows)]
+    {
+        match overlay::capture_region_for_debug() {
+            Some(region) => {
+                let summary = crate::debug::debug_capture(&region);
+                println!("[debug] {summary}");
+                // Affiche le résumé dans la carte overlay (autohide court).
+                store_overlay(serde_json::json!({
+                    "status": "debug",
+                    "message": summary,
+                    "autohide": 8,
+                }));
+            }
+            None => println!("[debug] impossible d'obtenir la position du curseur"),
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = app;
 }
 
 /// Ce que l'interface reçoit au démarrage et après chaque changement de réglages.
@@ -431,6 +472,14 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     if let Some(icon) = app.default_window_icon() {
         builder = builder.icon(icon.clone());
     }
+    // Handler de fermeture : nettoie l'overlay (cache la fenêtre + tue le sidecar)
+    builder = builder.on_menu_event(|app, ev| {
+        if ev.id().as_ref() == "quit" {
+            println!("[main] Quitting - cleaning up overlay");
+            let _ = overlay::cleanup(app);
+            app.exit(0);
+        }
+    });
     builder.build(app)?;
     Ok(())
 }
@@ -714,6 +763,8 @@ fn main() {
                         Some("capture")
                     } else if cfg.toggle.as_ref() == Some(shortcut) {
                         Some("toggle")
+                    } else if cfg.debug.as_ref() == Some(shortcut) {
+                        Some("debug")
                     } else {
                         None
                     };
@@ -756,11 +807,11 @@ fn main() {
                         }
                         "capture" => {
                             drop(cfg); // unlock before async spawn
-                            if let Some(window) = app.get_webview_window("overlay") {
-                                // Reveal sans voler le focus (ESC/Tab restent dans le jeu).
-                                overlay::reveal_overlay_no_activate(&window);
-                            }
                             spawn_overlay_capture(app);
+                        }
+                        "debug" => {
+                            drop(cfg);
+                            spawn_overlay_debug(app);
                         }
                         _ => {}
                     }
@@ -771,6 +822,11 @@ fn main() {
         .manage(Hotkeys(Mutex::new(HotkeySlots::default())))
         .setup(|app| {
             let handle = app.handle().clone();
+
+            // Purge the OCR debug BMP dumps from previous sessions — they are
+            // ~100 kB each and a tuning session easily leaves dozens behind.
+            #[cfg(windows)]
+            crate::debug::cleanup_debug_dir();
 
             // Check and download sidecar automatically at startup
             tauri::async_runtime::spawn_blocking(move || {
@@ -826,13 +882,18 @@ fn main() {
             }
             if let Some(win) = handle.get_webview_window("main") {
                 let w = win.clone();
+                let app = handle.clone();
                 // Fermeture : si l'option est active, on masque au lieu de quitter (l'icône reste visible).
+                // Sinon, on nettoie l'overlay avant de quitter.
                 win.on_window_event(move |ev| {
                     if let WindowEvent::CloseRequested { api, .. } = ev {
                         let st = w.app_handle().state::<AppState>();
                         if st.settings.lock().unwrap().close_to_tray {
                             api.prevent_close();
                             let _ = w.hide();
+                        } else {
+                            // Nettoyer l'overlay avant de quitter
+                            let _ = overlay::cleanup(&app);
                         }
                     }
                 });
@@ -848,6 +909,14 @@ fn main() {
             tauri::async_runtime::spawn_blocking(move || {
                 start_watchers(&watcher_handle);
             });
+
+            // S'assurer que l'overlay est bien caché au démarrage
+            // (au cas où la fenêtre aurait été montrée par erreur)
+            let overlay = handle.get_webview_window("overlay");
+            if let Some(w) = overlay {
+                let _ = w.hide();
+                println!("[main] Overlay window hidden at startup");
+            }
 
             Ok(())
         })

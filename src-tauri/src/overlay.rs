@@ -79,15 +79,17 @@ pub async fn start_overlay(config: OverlayConfig) -> Result<(), String> {
 /// Task Manager swipe) used to leave the app convinced the sidecar was up while
 /// nothing answered on the port. We now probe /health first and respawn when it
 /// is silent.
+#[cfg(windows)]
 fn spawn_sidecar(_config: OverlayConfig) -> Result<(), String> {
     use std::process::Command;
+    use std::os::windows::process::CommandExt;
+    use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 
     if sidecar_healthy() {
         println!("[overlay] sidecar already answering on :8765");
         return Ok(());
     }
 
-    // Dead or missing: forget any stale bookkeeping before respawning.
     OVERLAY_PID.store(0, Ordering::SeqCst);
 
     let exe_dir = std::env::current_exe().map_err(|e| e.to_string())?;
@@ -105,9 +107,52 @@ fn spawn_sidecar(_config: OverlayConfig) -> Result<(), String> {
     }
 
     println!("[overlay] Starting sidecar process...");
-    // Stdio::null (not piped) so the child doesn't inherit our stdout and can
-    // outlive this function without a pipe-buffer deadlock. We track the PID so
-    // stop_overlay() can kill it via taskkill.
+    match Command::new(&sidecar_path)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+    {
+        Ok(child) => {
+            let pid = child.id();
+            OVERLAY_PID.store(pid, Ordering::SeqCst);
+            println!("[overlay] Sidecar started with ID {}", pid);
+            std::mem::forget(child);
+            Ok(())
+        }
+        Err(e) => {
+            eprintln!("[overlay] Failed to start sidecar: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn spawn_sidecar(_config: OverlayConfig) -> Result<(), String> {
+    use std::process::Command;
+
+    if sidecar_healthy() {
+        println!("[overlay] sidecar already answering on :8765");
+        return Ok(());
+    }
+
+    OVERLAY_PID.store(0, Ordering::SeqCst);
+
+    let exe_dir = std::env::current_exe().map_err(|e| e.to_string())?;
+    let internal_dir = exe_dir.parent().map(|p| p.join("_internal")).unwrap_or_default();
+    std::fs::create_dir_all(&internal_dir).map_err(|e| e.to_string())?;
+    let sidecar_path = internal_dir.join("tarkov-server.exe");
+
+    if !sidecar_path.exists() {
+        println!("[overlay] Sidecar not found at {}. Attempting download...", sidecar_path.display());
+        download_latest_sidecar()?;
+    }
+
+    if !sidecar_path.exists() {
+        return Err("Failed to obtain sidecar after download attempt".to_string());
+    }
+
+    println!("[overlay] Starting sidecar process...");
     match Command::new(&sidecar_path)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -117,9 +162,6 @@ fn spawn_sidecar(_config: OverlayConfig) -> Result<(), String> {
             let pid = child.id();
             OVERLAY_PID.store(pid, Ordering::SeqCst);
             println!("[overlay] Sidecar started with ID {}", pid);
-            // Detach: forget the Child handle so it isn't killed when the
-            // scoped guard drops. It lives until stop_overlay() kills it or the
-            // parent exits.
             std::mem::forget(child);
             Ok(())
         }
@@ -296,10 +338,13 @@ pub struct CaptureRegion {
 impl CaptureRegion {
     /// Base offsets/sizes at 1920px. Tuned for EFT's inventory tooltip:
     /// the tooltip opens ABOVE and to the RIGHT of the cursor.
-    const OFFSET_X: f64 = 15.0;
-    const OFFSET_Y: f64 = -85.0;
-    const WIDTH: f64 = 360.0;
-    const HEIGHT: f64 = 100.0;
+    // MODIFICATION v0.9.9: bottom-left QUARTER of the previous 250x80 box —
+    // same bottom-left anchor (cursor + 13, cursor - 13), half width, half
+    // height. Top-left origin is therefore (cursor + 13, cursor - 53).
+    const OFFSET_X: f64 = 13.0;
+    const OFFSET_Y: f64 = -53.0;
+    const WIDTH: f64 = 125.0;
+    const HEIGHT: f64 = 40.0;
     const GROUND_OFFSET_X: f64 = -80.0;
     const GROUND_OFFSET_Y: f64 = 30.0;
     const GROUND_WIDTH: f64 = 160.0;
@@ -331,6 +376,13 @@ impl CaptureRegion {
 }
 
 static LOOKUP_SEQ: AtomicU64 = AtomicU64::new(0);
+
+/// Build the capture boxes for the current cursor position — used by the
+/// debug module to show/dump exactly what the sidecar will be asked to read.
+pub fn capture_region_for_debug() -> Option<CaptureRegion> {
+    let (cx, cy) = get_cursor_position();
+    Some(CaptureRegion::at(cx, cy))
+}
 
 /// Client HTTP partagé : en construire un à chaque capture coûtait une
 /// initialisation TLS à chaque F2 alors que le sidecar est en localhost.
@@ -710,7 +762,12 @@ pub fn get_cursor_position() -> (i32, i32) {
     (mouse.coords.0, mouse.coords.1)
 }
 
-/// Cleanup function called on app exit
-pub fn cleanup() {
-    stop_overlay().ok();
+/// Cleanup function called on app exit. Hides overlay window and stops sidecar.
+pub fn cleanup(app: &AppHandle) {
+    println!("[overlay] Cleanup: hiding overlay window and stopping sidecar");
+    // D'abord cacher la fenêtre overlay
+    let _ = hide_overlay_window(app);
+    // Puis tuer le sidecar
+    let _ = stop_overlay();
+    println!("[overlay] Cleanup complete");
 }
