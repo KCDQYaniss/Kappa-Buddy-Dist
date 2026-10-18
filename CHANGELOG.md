@@ -1,5 +1,10 @@
 # Changelog / Journal des modifications
 
+## 0.9.11 — Overlay unique
+
+### FR
+- Suppression du composant d'overlay dupliqué intégré à la fenêtre principale ; seul l'overlay natif dédié affiche maintenant les résultats OCR.
+
 ## 0.9.10 — Overlay : zone de capture optimisée et retrait de l'outil debug
 
 ### FR
