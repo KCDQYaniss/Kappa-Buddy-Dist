@@ -203,24 +203,6 @@
     if ((secs || 8) > 0) hideTimer = setTimeout(hide, (secs || 8) * 1000);
   }
 
-  // Debug OCR (F3) : affiche le résumé des zones capturées dans la carte.
-  function showDebug(msg) {
-    const lines = String(msg || "").split("\n");
-    $("overlay-name").textContent = truncate(lines[0] || "Debug OCR", 40);
-    $("overlay-name").classList.remove("placeholder");
-    $("overlay-icon").style.backgroundImage = "";
-    $("overlay-flea").textContent = lines[1] || "—";
-    $("overlay-trader").textContent = lines[2] || "—";
-    $("overlay-slot").textContent = "—";
-    $("overlay-quest").textContent = "—";
-    $("overlay-raw").textContent = truncate(lines[3] || "", 60);
-    $("overlay-barter-row").hidden = true; $("overlay-craft-row").hidden = true;
-    show();
-    fitWindow();
-    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
-    hideTimer = setTimeout(hide, 8000);
-  }
-
   async function poll() {
     if (!invoke) return;
     try {
@@ -249,8 +231,6 @@
         if (secs > 0) hideTimer = setTimeout(hide, secs * 1000);
       } else if (status === "error") {
         showError(data.message || "Erreur de lecture", data.autohide);
-      } else if (status === "debug") {
-        showDebug(data.message || "Debug");
       } else if (status === "not-in-game") {
         showError("Lance Tarkov d'abord", data.autohide || 4);
       }

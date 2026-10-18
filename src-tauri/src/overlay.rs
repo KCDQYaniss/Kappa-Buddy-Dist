@@ -377,13 +377,6 @@ impl CaptureRegion {
 
 static LOOKUP_SEQ: AtomicU64 = AtomicU64::new(0);
 
-/// Build the capture boxes for the current cursor position — used by the
-/// debug module to show/dump exactly what the sidecar will be asked to read.
-pub fn capture_region_for_debug() -> Option<CaptureRegion> {
-    let (cx, cy) = get_cursor_position();
-    Some(CaptureRegion::at(cx, cy))
-}
-
 /// Client HTTP partagé : en construire un à chaque capture coûtait une
 /// initialisation TLS à chaque F2 alors que le sidecar est en localhost.
 static LOOKUP_CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();

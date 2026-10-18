@@ -1,5 +1,4 @@
 mod data;
-mod debug;
 mod ocr;
 mod overlay;
 mod priority;

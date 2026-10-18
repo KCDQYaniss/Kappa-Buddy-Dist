@@ -1,5 +1,17 @@
 # Changelog / Journal des modifications
 
+## 0.9.10 — Overlay : zone de capture optimisée et retrait de l'outil debug
+
+### FR
+- **Zone de capture OCR recalibrée** : boîte de 125×40 px dont le coin bas-gauche est ancré à 13 px au-dessus et 13 px à droite du curseur — cible uniquement le nom de l'item survolé, élimine les lectures parasites (items voisins, libellés « Key Tool »/« Buy »)
+- **Retrait de l'outil de debug OCR** : le raccourci F3, le cadre rouge et les dumps BMP introduits pour le réglage sont supprimés ; l'overlay retrouve son fonctionnement original (F2 capture, Shift+F2 affichage)
+- **Conservation des correctifs de robustesse** : nettoyage overlay/sidecar à la fermeture, absence de fenêtre console pour le sidecar, masquage autoritaire de la fenêtre overlay
+
+### EN
+- **Recalibrated OCR capture region**: 125×40 px box anchored bottom-left 13 px above and 13 px right of the cursor — targets only the hovered item name, eliminating stray reads (neighbouring items, "Key Tool"/"Buy" labels)
+- **Removed OCR debug tool**: the F3 hotkey, red frame and BMP dumps introduced for tuning are removed; the overlay is back to its original behaviour (F2 capture, Shift+F2 toggle)
+- **Kept robustness fixes**: overlay/sidecar cleanup on exit, no console window for the sidecar, authoritative overlay window hiding
+
 ## 0.8.22 — Hideout : correction des items manquants et amélioration de l'overlay
 
 ### FR

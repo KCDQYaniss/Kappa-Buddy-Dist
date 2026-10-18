@@ -1,7 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod data;
-mod debug;
 mod ocr;
 mod overlay;
 mod priority;
@@ -122,7 +121,6 @@ struct AppState {
 struct HotkeySlots {
     capture: Option<Shortcut>,
     toggle: Option<Shortcut>,
-    debug: Option<Shortcut>,
 }
 struct Hotkeys(Mutex<HotkeySlots>);
 
@@ -146,17 +144,6 @@ fn apply_overlay_hotkeys(app: &AppHandle, capture: &str, toggle: &str) -> Result
     }
     if let Some(old) = cfg.toggle.take() {
         let _ = gs.unregister(old);
-    }
-    if let Some(old) = cfg.debug.take() {
-        let _ = gs.unregister(old);
-    }
-
-    // Debug hotkey: fixed F3, dumps the capture boxes as BMPs and flashes the
-    // on-screen frame. Always registered when the overlay feature is on.
-    if let Ok(parsed) = "F3".parse::<Shortcut>() {
-        if gs.register(parsed.clone()).is_ok() {
-            cfg.debug = Some(parsed);
-        }
     }
 
     if !capture.trim().is_empty() {
@@ -254,30 +241,6 @@ fn spawn_overlay_capture(app: &AppHandle) {
     tauri::async_runtime::spawn(async move {
         run_overlay_capture(&handle).await;
     });
-}
-
-/// Debug OCR (F3) : dump BMP des zones envoyées au sidecar + cadre rouge à
-/// l'écran autour de la zone principale. Ne déclenche PAS de lecture OCR —
-/// le cadre ne peut donc pas polluer la capture.
-fn spawn_overlay_debug(_app: &AppHandle) {
-    #[cfg(windows)]
-    {
-        match overlay::capture_region_for_debug() {
-            Some(region) => {
-                let summary = crate::debug::debug_capture(&region);
-                println!("[debug] {summary}");
-                // Affiche le résumé dans la carte overlay (autohide court).
-                store_overlay(serde_json::json!({
-                    "status": "debug",
-                    "message": summary,
-                    "autohide": 8,
-                }));
-            }
-            None => println!("[debug] impossible d'obtenir la position du curseur"),
-        }
-    }
-    #[cfg(not(windows))]
-    let _ = app;
 }
 
 /// Ce que l'interface reçoit au démarrage et après chaque changement de réglages.
@@ -763,8 +726,6 @@ fn main() {
                         Some("capture")
                     } else if cfg.toggle.as_ref() == Some(shortcut) {
                         Some("toggle")
-                    } else if cfg.debug.as_ref() == Some(shortcut) {
-                        Some("debug")
                     } else {
                         None
                     };
@@ -809,10 +770,6 @@ fn main() {
                             drop(cfg); // unlock before async spawn
                             spawn_overlay_capture(app);
                         }
-                        "debug" => {
-                            drop(cfg);
-                            spawn_overlay_debug(app);
-                        }
                         _ => {}
                     }
                 })
@@ -822,11 +779,6 @@ fn main() {
         .manage(Hotkeys(Mutex::new(HotkeySlots::default())))
         .setup(|app| {
             let handle = app.handle().clone();
-
-            // Purge the OCR debug BMP dumps from previous sessions — they are
-            // ~100 kB each and a tuning session easily leaves dozens behind.
-            #[cfg(windows)]
-            crate::debug::cleanup_debug_dir();
 
             // Check and download sidecar automatically at startup
             tauri::async_runtime::spawn_blocking(move || {
