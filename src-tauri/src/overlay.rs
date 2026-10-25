@@ -14,6 +14,7 @@
 //!   display resolution.
 
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use device_query::{DeviceQuery, DeviceState};
 use tauri::AppHandle;
@@ -30,15 +31,6 @@ pub struct OverlayConfig {
     pub game_mode: String,
     pub cursor_offset_x: i32,
     pub cursor_offset_y: i32,
-}
-
-#[derive(Serialize, Deserialize, Clone, Default)]
-pub struct OverlayState {
-    pub active: bool,
-    pub enabled: bool,
-    pub opacity: f64,
-    pub running: bool,
-    pub pid: Option<u32>,
 }
 
 /// Does the sidecar answer on its port right now?
@@ -172,26 +164,112 @@ fn spawn_sidecar(_config: OverlayConfig) -> Result<(), String> {
     }
 }
 
-/// Anchor of the overlay window: fixed in the top-left corner of the screen.
+/// Historical anchor of the overlay window (top-left corner, 16/16 physical
+/// px) — kept byte-for-byte: this is the user-validated position. The other
+/// corners derive from the chosen anchor setting.
 pub const OVERLAY_ANCHOR: (i32, i32) = (16, 16);
+static OVERLAY_ANCHOR_MODE: Mutex<String> = Mutex::new(String::new());
 
-/// Position the overlay window at the given screen coordinates.
-pub fn position_overlay(app: &AppHandle, x: i32, y: i32) -> Result<(), String> {
-    use tauri::Manager;
-    if let Some(window) = app.get_webview_window("overlay") {
-        let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
+/// Remember the card corner chosen in the settings ("TL"|"TR"|"BL"|"BR").
+pub fn set_overlay_anchor(anchor: &str) {
+    let a = anchor.trim().to_ascii_uppercase();
+    *OVERLAY_ANCHOR_MODE.lock().unwrap() = if matches!(a.as_str(), "TL" | "TR" | "BL" | "BR") {
+        a
+    } else {
+        "TL".to_string()
+    };
+}
+
+/// Top-left screen position (physical px) for a window of `w_phys × h_phys` on
+/// a monitor at `(mx, my, mw, mh)`. "TL" reproduces the historical constant
+/// `OVERLAY_ANCHOR` exactly (16/16 physical, resolution-independent) so the
+/// user-validated default cannot drift; other corners use a DPI-scaled margin.
+/// Pure — unit-tested.
+pub(crate) fn anchor_xy(anchor: &str, mon: (i32, i32, i32, i32), scale: f64, w_phys: i32, h_phys: i32) -> (i32, i32) {
+    let (mx, my, mw, mh) = mon;
+    let margin = {
+        let m = if anchor == "TL" { 16.0_f64 } else { 16.0 * scale.max(0.1) };
+        m.round() as i32
+    };
+    let left = mx + margin;
+    let top = my + margin;
+    match anchor {
+        "TR" => ((mx + mw - w_phys - margin).max(left), top),
+        "BL" => (left, (my + mh - h_phys - margin).max(top)),
+        "BR" => ((mx + mw - w_phys - margin).max(left), (my + mh - h_phys - margin).max(top)),
+        // "TL" and anything unexpected: historical position, relative to the
+        // monitor currently carrying the cursor (primary = unchanged values).
+        _ => (mx + OVERLAY_ANCHOR.0, my + OVERLAY_ANCHOR.1),
     }
+}
+
+/// The monitor under the cursor (that is where the game runs); falls back to
+/// the window's current monitor, then the primary one.
+fn pick_monitor(window: &tauri::WebviewWindow) -> Option<tauri::Monitor> {
+    let cursor = get_cursor_position();
+    let all = window.available_monitors().ok()?;
+    for m in &all {
+        let pos = m.position();
+        let size = m.size();
+        let (mx, my) = (pos.x, pos.y);
+        if cursor.0 >= mx && cursor.0 < mx + size.width as i32
+            && cursor.1 >= my && cursor.1 < my + size.height as i32
+        {
+            return Some(m.clone());
+        }
+    }
+    window.current_monitor().ok().flatten().or_else(|| all.first().cloned())
+}
+
+/// Position the overlay window at the anchor chosen in the settings, on the
+/// monitor under the cursor. `w_logical/h_logical` are the card pixel size in
+/// logical units (as emitted by the webview); omitted only when the window has
+/// not been sized yet.
+pub fn position_overlay_by_anchor(app: &AppHandle, w_logical: Option<f64>, h_logical: Option<f64>) -> Result<(), String> {
+    use tauri::{Manager, PhysicalPosition};
+    let window = app
+        .get_webview_window("overlay")
+        .ok_or_else(|| "overlay window not found".to_string())?;
+    let (lw, lh) = match (w_logical, h_logical) {
+        (Some(w), Some(h)) => (w, h),
+        _ => {
+            // Fall back to the current physical size converted with the monitor scale.
+            let mon = pick_monitor(&window);
+            let sf = mon.as_ref().map(|m| m.scale_factor()).unwrap_or(1.0);
+            let phys = window.inner_size().unwrap_or_default();
+            ((phys.width as f64 / sf), (phys.height as f64 / sf))
+        }
+    };
+    let anchor = OVERLAY_ANCHOR_MODE.lock().unwrap().clone();
+    let (x, y) = match pick_monitor(&window) {
+        Some(mon) => {
+            let sf = mon.scale_factor();
+            let pos = mon.position();
+            let size = mon.size();
+            anchor_xy(
+                &anchor,
+                (pos.x, pos.y, size.width as i32, size.height as i32),
+                sf,
+                (lw * sf).round() as i32,
+                (lh * sf).round() as i32,
+            )
+        }
+        None => (OVERLAY_ANCHOR.0, OVERLAY_ANCHOR.1),
+    };
+    window
+        .set_position(PhysicalPosition::new(x, y))
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
-/// Show the overlay window at the fixed anchor, without stealing focus and
+/// Show the overlay window at the configured anchor, without stealing focus and
 /// without swallowing mouse clicks.
 pub fn show_overlay_window(app: &AppHandle) -> Result<(), String> {
     use tauri::Manager;
     let window = app
         .get_webview_window("overlay")
         .ok_or_else(|| "overlay window not found".to_string())?;
-    let _ = position_overlay(app, OVERLAY_ANCHOR.0, OVERLAY_ANCHOR.1);
+    let _ = position_overlay_by_anchor(app, None, None);
     reveal_overlay_no_activate(&window);
     Ok(())
 }
@@ -350,9 +428,9 @@ impl CaptureRegion {
     const GROUND_WIDTH: f64 = 160.0;
     const GROUND_HEIGHT: f64 = 30.0;
 
-    /// Build the capture boxes for a cursor position.
-    pub fn at(cursor_x: i32, cursor_y: i32) -> Self {
-        let scale = (primary_monitor_width() as f64 / 1920.0).max(1.0);
+    /// Pure builder for the capture boxes at a given resolution scale — the
+    /// unit-testable core. `at` plugs the live monitor width into it.
+    pub fn scaled(scale: f64, cursor_x: i32, cursor_y: i32) -> Self {
         let r = |v: f64| (v * scale).round() as i32;
         let offset_x = r(Self::OFFSET_X);
         let width = r(Self::WIDTH);
@@ -372,6 +450,12 @@ impl CaptureRegion {
             ground_width: r(Self::GROUND_WIDTH),
             ground_height: r(Self::GROUND_HEIGHT),
         }
+    }
+
+    /// Build the capture boxes for a cursor position.
+    pub fn at(cursor_x: i32, cursor_y: i32) -> Self {
+        let scale = (primary_monitor_width() as f64 / 1920.0).max(1.0);
+        Self::scaled(scale, cursor_x, cursor_y)
     }
 }
 
@@ -399,8 +483,10 @@ fn lookup_client() -> Result<&'static reqwest::Client, String> {
 ///
 /// `lang` must be the *game* language: the OCR matches the recognised text
 /// against the tarkov.dev catalog in that language. `game_mode` uses the
-/// sidecar's own vocabulary — "regular" or "pve".
-pub async fn lookup_once(lang: &str, game_mode: &str) -> Result<serde_json::Value, String> {
+/// sidecar's own vocabulary — "regular" or "pve". `corrections` is the
+/// user-maintained OCR fix table (raw read text → canonical item name); sent
+/// on every lookup so one learned fix applies to all future reads.
+pub async fn lookup_once(lang: &str, game_mode: &str, corrections: Option<String>) -> Result<serde_json::Value, String> {
     let (cx, cy) = get_cursor_position();
     let region = CaptureRegion::at(cx, cy);
     let seq = LOOKUP_SEQ.fetch_add(1, Ordering::SeqCst) + 1;
@@ -421,6 +507,19 @@ pub async fn lookup_once(lang: &str, game_mode: &str) -> Result<serde_json::Valu
         "ground_height": region.ground_height,
         "client_seq": seq,
     });
+    let body = match corrections {
+        // La table attendue par le sidecar est dict[str, str] ; on ne pousse
+        // que du JSON objet — jamais du JSON texte transformé en chaîne.
+        Some(c) if c.trim().is_empty() => body,
+        Some(c) => {
+            let mut body = body;
+            body.as_object_mut()
+                .unwrap()
+                .insert("corrections".to_string(), serde_json::Value::from(c));
+            body
+        }
+        None => body,
+    };
 
     println!(
         "[overlay] lookup #{seq} cursor=({cx},{cy}) box=({},{},{},{}) ground=({},{},{},{}) lang={lang} mode={game_mode}",
@@ -649,28 +748,6 @@ pub fn stop_overlay() -> Result<(), String> {
     Ok(())
 }
 
-/// Get the current overlay state
-pub fn get_overlay_state() -> OverlayState {
-    let pid = OVERLAY_PID.load(Ordering::SeqCst);
-    OverlayState {
-        active: OVERLAY_ENABLED.load(Ordering::SeqCst),
-        enabled: OVERLAY_ENABLED.load(Ordering::SeqCst),
-        opacity: 0.92,
-        running: pid > 0,
-        pid: if pid > 0 { Some(pid) } else { None },
-    }
-}
-
-/// Set overlay configuration
-pub async fn set_overlay_config(enabled: bool, opacity: f64) -> Result<(), String> {
-    let config = OverlayConfig {
-        enabled,
-        opacity,
-        ..Default::default()
-    };
-    start_overlay(config).await
-}
-
 /// Toggle the whole feature on/off: sidecar process + window visibility.
 /// Turning it off also frees the ~800MB the Python sidecar holds.
 pub async fn toggle_overlay(app: &AppHandle, enabled: bool) -> Result<(), String> {
@@ -728,7 +805,7 @@ pub fn reveal_overlay_no_activate(window: &tauri::WebviewWindow) {
 ///
 /// Even if the platform still paints an opaque backing behind the webview, the
 /// user only ever sees the card because the window *is* the card. The window is
-/// re-anchored to the top-left corner after every resize.
+/// re-anchored (chosen corner, monitor under the cursor) after every resize.
 pub fn resize_overlay_window(app: &AppHandle, width: f64, height: f64) -> Result<(), String> {
     use tauri::{LogicalSize, Manager};
     let window = app
@@ -744,7 +821,7 @@ pub fn resize_overlay_window(app: &AppHandle, width: f64, height: f64) -> Result
     window
         .set_size(LogicalSize::new(w, h))
         .map_err(|e| e.to_string())?;
-    let _ = position_overlay(app, OVERLAY_ANCHOR.0, OVERLAY_ANCHOR.1);
+    let _ = position_overlay_by_anchor(app, Some(w), Some(h));
     Ok(())
 }
 
@@ -753,6 +830,100 @@ pub fn get_cursor_position() -> (i32, i32) {
     let device_state = DeviceState::new();
     let mouse = device_state.get_mouse();
     (mouse.coords.0, mouse.coords.1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// La géométrie de capture VALIDÉE par l'utilisateur à 1920px est conservée
+    /// telle quelle : la boîte est le quart bas-gauche de l'ancien 250x80, donc
+    /// origine (curseur +13, curseur −53) et taille 125x40.
+    #[test]
+    fn capture_region_at_1920_matches_validated_geometry() {
+        let r = CaptureRegion::scaled(1.0, 1000, 500);
+        assert_eq!(r.x, 1013);
+        assert_eq!(r.y, 447);
+        assert_eq!(r.width, 125);
+        assert_eq!(r.height, 40);
+        assert_eq!(r.mirror_x, 1000 - 13 - 125);
+        assert_eq!(r.ground_x, 920);
+        assert_eq!(r.ground_y, 530);
+        assert_eq!(r.ground_width, 160);
+        assert_eq!(r.ground_height, 30);
+    }
+
+    /// EFT met le tooltip à l'échelle de l'écran : 1440p → ×1.333, 4K → ×2.0.
+    /// Le coin haut-GAUCHE reste `curseur + OFFSET`, l'ancrage bas-gauche
+    /// historique (~curseur +13, ~curseur −13) suit l'arrondi indépendant.
+    #[test]
+    fn capture_region_scales_with_resolution() {
+        // 1440p (×1.333…) : OFFSET_X 17, size 167x53, miroir à gauche.
+        let hd = CaptureRegion::scaled(2560.0 / 1920.0, 1000, 500);
+        assert_eq!(hd.x, 1017);              // 1000 + round(13×1.3333)
+        assert_eq!(hd.y, 429);               // 500 − round(53×1.3333)
+        assert_eq!(hd.width, 167);
+        assert_eq!(hd.height, 53);
+        assert_eq!(hd.mirror_x, 1000 - 17 - 167);
+        assert_eq!(hd.ground_x, 893);        // 1000 + round(−80×1.3333)
+        assert_eq!(hd.ground_y, 540);        // 500 + round(30×1.3333)
+        assert_eq!(hd.ground_width, 213);
+        assert_eq!(hd.ground_height, 40);
+
+        // 4K (×2.0) : taille exactement double de la géométrie validée.
+        let r = CaptureRegion::scaled(3840.0 / 1920.0, 1000, 500);
+        assert_eq!(r.x, 1026);               // 1000 + 26
+        assert_eq!(r.y, 394);                // 500 − 106
+        assert_eq!(r.width, 250);
+        assert_eq!(r.height, 80);
+        assert_eq!(r.mirror_x, 1000 - 26 - 250);
+        assert_eq!(r.ground_x, 840);
+        assert_eq!(r.ground_y, 560);
+        assert_eq!(r.ground_width, 320);
+        assert_eq!(r.ground_height, 60);
+    }
+
+    /// « TL » reste la position historique exacte, quel que soit le DPI.
+    #[test]
+    fn anchor_tl_is_historical_constant() {
+        let mon = (0, 0, 3840, 2160);
+        assert_eq!(anchor_xy("TL", mon, 2.0, 500, 400), (16, 16));
+        let sec = (-1920, -2000, 1920, 1080);
+        assert_eq!(anchor_xy("TL", sec, 1.25, 500, 400), (-1920 + 16, -2000 + 16));
+    }
+
+    /// Les autres coins collent au bord droit/bas de l'écran CDN avec marge DPI.
+    #[test]
+    fn anchor_corners_hug_the_monitor() {
+        let mon = (0, 0, 1920, 1080);
+        let scale = 1.5f64;
+        let (wx, wy) = anchor_xy("TR", mon, scale, 600, 400);
+        assert_eq!(wx, 1920 - 600 - (16.0 * scale).round() as i32);
+        assert_eq!(wy, (16.0 * scale).round() as i32);
+        let (bx, by) = anchor_xy("BR", mon, scale, 600, 400);
+        assert_eq!(bx, wx);
+        assert_eq!(by, 1080 - 400 - (16.0 * scale).round() as i32);
+        let (lx, ly) = anchor_xy("BL", mon, scale, 600, 400);
+        assert_eq!(lx, (16.0 * scale).round() as i32);
+        assert_eq!(ly, by);
+    }
+
+    /// Fenêtre plus grosse que l'écran margin compris : les coins ne passent
+    /// pas du côté opposé (clamp au coin haut-gauche du moniteur).
+    #[test]
+    fn anchor_corners_never_flip_past_the_top_left() {
+        let mon = (0, 0, 1000, 800);
+        let (x, y) = anchor_xy("BR", mon, 1.0, 980, 780);
+        assert_eq!(x, 16);
+        assert_eq!(y, 16);
+    }
+
+    /// Clé invalide → TL (jamais d'invention de coin).
+    #[test]
+    fn unknown_anchor_falls_back_to_tl() {
+        let mon = (0, 0, 1920, 1080);
+        assert_eq!(anchor_xy("zz", mon, 1.0, 500, 400), (16, 16));
+    }
 }
 
 /// Cleanup function called on app exit. Hides overlay window and stops sidecar.

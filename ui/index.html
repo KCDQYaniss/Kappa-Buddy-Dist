@@ -169,7 +169,40 @@
       <label class="chk"><input id="s-startmin" type="checkbox"><span data-i18n="set.startmin">Démarrer réduit (dans la zone de notification)</span></label>
       <label class="chk"><input id="s-ontop" type="checkbox"><span data-i18n="set.ontop">Fenêtre toujours au premier plan</span></label>
       <label class="chk"><input id="s-cursor-overlay" type="checkbox"><span data-i18n="set.cursorOverlay">Overlay prix dans le jeu</span></label>
+      <label><span data-i18n="set.overlayOpacity">Opacité du fond de la carte</span>
+        <input id="s-overlay-opacity" type="range" min="0.3" max="1" step="0.05" value="0.95">
+        <span class="hint" id="s-overlay-opacity-val">0.95</span>
       </label>
+      <label><span data-i18n="set.overlayScale">Taille du texte</span>
+        <input id="s-overlay-scale" class="txt sm" type="number" min="0.7" max="2" step="0.1" value="1">
+      </label>
+      <label><span data-i18n="set.overlayAnchor">Position de la carte</span>
+        <select id="s-overlay-anchor">
+          <option value="TL" data-i18n="set.anchor.tl">Coin haut-gauche (défaut)</option>
+          <option value="TR" data-i18n="set.anchor.tr">Coin haut-droit</option>
+          <option value="BL" data-i18n="set.anchor.bl">Coin bas-gauche</option>
+          <option value="BR" data-i18n="set.anchor.br">Coin bas-droit</option>
+        </select>
+      </label>
+      <div class="row ub-row"><details class="diag" id="overlay-sections-box">
+        <summary data-i18n="set.overlaySections">Sections de la carte</summary>
+        <div class="body" id="s-overlay-sections"></div>
+      </details></div>
+      <label class="chk"><input id="s-overlay-auto" type="checkbox"><span data-i18n="set.overlayAuto">Prix au survol (mode auto)</span></label>
+      <p class="hint" data-i18n="set.overlayAutoHint">Capture un objet dès que le curseur bouge dans Tarkov (throttlé, jamais en fond quand la carte est fermée). Active l'OCR en continu : coûteux, laisse désactivé pendant les raids si la machine chauffe.</p>
+      <label class="chk"><span data-i18n="set.autoHotkey">Raccourci bascule mode auto (vide = non lié)</span>
+        <input id="s-auto-hotkey" class="txt sm" type="text" placeholder="Alt+F2">
+      </label>
+      <label class="chk"><span data-i18n="set.hideHotkey">Raccourci masquer la carte (vide = non lié)</span>
+        <input id="s-hide-hotkey" class="txt sm" type="text" placeholder="Ctrl+Alt+F2">
+      </label>
+      <details class="diag" id="overlay-corrections-box">
+        <summary data-i18n="set.corrections">Corrections OCR</summary>
+        <div class="body">
+          <p class="hint" data-i18n="set.correctionsHint">Quand un objet est lu à tort, écris une correction par ligne : texte lu = nom officiel. Mémorisé, envoyé à chaque lecture.</p>
+          <textarea id="s-corrections" class="txt" rows="4" placeholder="dague balistique = Balistic Dagger"></textarea>
+        </div>
+      </details>
       <label class="chk"><span data-i18n="set.captureHotkey">Raccourci lecture (F2)</span>
         <input id="s-capture-hotkey" class="txt sm" type="text" placeholder="F2">
       </label>

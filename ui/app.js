@@ -174,6 +174,31 @@
     if (overlay) overlay.style.display = "none";
   }
 
+  function bindOverlaySettingsUi() {
+    const opac = $("s-overlay-opacity");
+    if (opac) opac.addEventListener("input", () => { $("s-overlay-opacity-val").textContent = opac.value; });
+  }
+  /** Représentation texte des corrections OCR : « texte lu = nom officiel »
+   *  par ligne. Clé mise en minuscules (la table du sidecar est minuscule),
+   *  valeur telle qu'épinglée par l'utilisateur.
+   *  Ignoré : lignes vides/malformées, clés déjà présentes ou égales à la
+   *  valeur (correction qui ne corrige rien). */
+  function parseCorrections(text) {
+    const out = {};
+    for (const rawLine of String(text || "").split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line) continue;
+      const eq = line.indexOf("=");
+      if (eq < 1) { TT.warn(t("set.correctionsBadLine", { line: truncate(line, 40) })); continue; }
+      const key = line.slice(0, eq).trim().toLowerCase().replace(/\s+/g, " ");
+      const value = line.slice(eq + 1).trim().replace(/\s+/g, " ");
+      if (!key || !value || key === value) continue;
+      out[key] = value;
+    }
+    return out;
+  }
+  function truncate(s, n) { s = String(s || ""); return s.length > n ? s.substring(0, n) + "…" : s; }
+
   function initCursorOverlay() {
     const overlay = getCursorOverlay();
     if (!overlay) return;
@@ -401,12 +426,59 @@
     $("s-toggle-hotkey").value = (state && state.overlay_toggle_hotkey) || "Shift+F2";
     $("s-game-lang").value = (state && state.overlay_game_lang) || "en";
     $("s-autohide").value = (state && state.overlay_autohide_sec) || 8;
+    // Carte : opacité du fond, échelle du texte, coin, section, mode auto.
+    const opac = state ? state.cursor_overlay_opacity : 0.95;
+    $("s-overlay-opacity").value = opac > 0 ? opac : 0.95;
+    $("s-overlay-opacity-val").textContent = $("s-overlay-opacity").value;
+    $("s-overlay-scale").value = (state && state.overlay_text_scale) || 1;
+    $("s-overlay-anchor").value = (state && state.overlay_anchor) || "TL";
+    $("s-overlay-auto").checked = !!(state && state.overlay_auto_enabled);
+    $("s-auto-hotkey").value = (state && state.overlay_auto_hotkey) || "";
+    $("s-hide-hotkey").value = (state && state.overlay_hide_hotkey) || "";
+    const corr = (state && state.overlay_corrections) || {};
+    $("s-corrections").value = Object.entries(corr).map(([k, v]) => k + " = " + v).join("\n");
+    renderOverlaySectionBoxes();
+    syncOverlaySectionBoxes(state);
     $("s-hint").innerHTML = t("set.hint", { path: "<code>…\\Escape from Tarkov\\build\\Logs</code>" });
     $("settings").showModal();
     // Un souci est déjà connu (logs introuvables) : on montre le diagnostic tout de suite.
     if (withDiag === true || (!DEMO && TT.logsOk === false)) { $("diag").open = true; runDiag(); }
   }
   TT.openSettings = openSettings;
+  /// Clés de sections de la carte + libellés FR (la carte est FR, cohérent).
+  const OVERLAY_SECTIONS = [
+    ["flea", "Flea market", "Prix du Flea market + tendance 48h"],
+    ["flea_history", "Prix 24h", "Fourchette 24h et nombre d'offres"],
+    ["traders", "Meilleur marchand", "Marchand qui paie le mieux"],
+    ["traders_all", "Autres marchands", "Prix chez les autres marchands"],
+    ["slot", "Prix / slot", "et / kg quand le poids est connu"],
+    ["quests", "Quêtes", "avec FIR ⚑, Kappa et ta progression"],
+    ["barter", "Barter", "comment le récupérer par échange"],
+    ["barter_using", "Échangé", "où dépenser cet objet"],
+    ["hideout", "Planque", "améliorations de la planque"],
+    ["crafts", "Crafts", "recettes le produisant"],
+    ["buy", "Acheter", "prix d'achat chez les marchands"],
+    ["raw", "Texte lu", "texte brut reconnu par l'OCR (debug)"],
+  ];
+  function overlayDefaultSections() {
+    return OVERLAY_SECTIONS.map(([k]) => k).filter((k) => k !== "buy" && k !== "raw");
+  }
+  function renderOverlaySectionBoxes() {
+    const box = $("s-overlay-sections");
+    if (!box) return;
+    if (box.dataset.rendered) return; // construit une fois : cases pilotées par checked
+    box.dataset.rendered = "1";
+    box.innerHTML = OVERLAY_SECTIONS.map(([k, label, hint]) =>
+      `<label class="chk sec-chk" data-sk="${k}" title="${esc(hint)}"><input type="checkbox" checked><span>${esc(label)}</span></label>`
+    ).join("");
+  }
+  function syncOverlaySectionBoxes(state) {
+    const on = new Set((state && state.overlay_sections) || overlayDefaultSections());
+    document.querySelectorAll("#s-overlay-sections .sec-chk").forEach((l) => {
+      l.querySelector("input").checked = on.has(l.dataset.sk);
+    });
+  }
+
   async function saveSettings() {
     const settings = {
       screenshots_dir: $("s-shots").value.trim() || null,
@@ -420,7 +492,16 @@
       always_on_top: $("s-ontop").checked,
       check_updates: $("s-updates").checked,
       cursor_overlay_enabled: $("s-cursor-overlay").checked,
-      cursor_overlay_opacity: state?.cursor_overlay_opacity ?? 0.95,
+      cursor_overlay_opacity: parseFloat($("s-overlay-opacity").value) || 0.95,
+      overlay_text_scale: parseFloat($("s-overlay-scale").value) || 1,
+      overlay_anchor: $("s-overlay-anchor").value,
+      overlay_sections: [...document.querySelectorAll("#s-overlay-sections .sec-chk")]
+        .filter((l) => l.querySelector("input").checked)
+        .map((l) => l.dataset.sk),
+      overlay_auto_enabled: $("s-overlay-auto").checked,
+      overlay_auto_hotkey: $("s-auto-hotkey").value.trim(),
+      overlay_hide_hotkey: $("s-hide-hotkey").value.trim(),
+      overlay_corrections: parseCorrections($("s-corrections").value),
       overlay_capture_hotkey: $("s-capture-hotkey").value.trim() || "F2",
       overlay_toggle_hotkey: $("s-toggle-hotkey").value.trim() || "Shift+F2",
       overlay_game_lang: $("s-game-lang").value,
@@ -551,6 +632,11 @@
     };
     bindHotkeyInput("s-capture-hotkey");
     bindHotkeyInput("s-toggle-hotkey");
+    bindHotkeyInput("s-auto-hotkey");
+    bindHotkeyInput("s-hide-hotkey");
+    bindOverlaySettingsUi();
+    // Un raccourci refusé par Windows est une erreur visible, pas un println.
+    await listen("overlay_error", (e) => TT.warn(e.payload));
     TT.store.on((k) => {
       if (k === "status" || k === "data") renderStatus();
       if (k === "progress" || k === "data") renderBadges();

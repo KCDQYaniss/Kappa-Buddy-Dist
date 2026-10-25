@@ -20,85 +20,147 @@
     }
     .hidden { display: none !important; }
     /* L'attribut hidden est écrasé par .o-row { display:flex } (règle d'auteur
-       > feuille du navigateur) : sans ceci, les lignes Barter/Craft restent
-       affichées même quand le JS les marque comme masquées. */
+       > feuille du navigateur) : sans ceci, les lignes/sections restent
+       affichées même quand le JS les masque. */
     [hidden] { display: none !important; }
 
+    /* Palette Tarkov : fond charbon translucide (opacité configurable via
+       --bg-a), liseré doré discret, texte plein. L'ÉCHELLE DU TEXTE est
+       pilotée par --k (0.7 → 2.0) : chaque taille en dérive par calc(). */
     .cursor-overlay {
       position: relative;
       width: 320px;
       box-sizing: border-box;
-      background: rgba(26, 21, 24, 0.92);
-      border: 2px solid #ffd700;
+      --bg-a: 0.95;
+      --k: 1;
+      background: rgba(26, 21, 24, var(--bg-a));
+      border: 2px solid #8a7b52;
       border-radius: 6px;
       color: #ffffff;
-      font-size: 13px;
-      line-height: 1.4;
+      font-size: calc(13px * var(--k));
+      line-height: 1.35;
       overflow: hidden;
       display: block;
     }
     .o-header {
       display: flex; align-items: center; gap: 8px;
-      padding: 7px 10px 6px;
+      padding: calc(7px * var(--k)) calc(10px * var(--k)) calc(6px * var(--k));
       border-bottom: 1px solid #55554c;
-      background: rgba(0, 0, 0, 0.25);
+      background: rgba(0, 0, 0, calc(var(--bg-a) * 0.27));
     }
     .o-icon {
-      width: 26px; height: 26px; flex-shrink: 0;
+      width: calc(26px * var(--k)); height: calc(26px * var(--k)); flex-shrink: 0;
       background: #55554c; border-radius: 3px;
       background-size: contain; background-repeat: no-repeat; background-position: center;
       border: 1px solid #55554c;
     }
     .o-name {
-      font-size: 13px; font-weight: 600; color: #ffffff;
+      font-size: calc(13px * var(--k)); font-weight: 600; color: #ffffff;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       max-width: 246px; line-height: 1.2; margin: 0;
     }
     .o-name.placeholder { color: #a8a397; font-weight: 400; }
-    .o-body { padding: 6px 10px 8px; }
-    .o-row { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; }
-    .o-label { color: #a8a397; font-size: 12px; white-space: nowrap; }
+    .o-sub { font-size: calc(10px * var(--k)); color: #a8a397; }
+    .o-body { padding: calc(5px * var(--k)) calc(10px * var(--k)) calc(7px * var(--k)); }
+    .o-sec { border-top: 1px solid #3a3832; padding: calc(2px * var(--k)) 0; }
+    .o-sec:first-child { border-top: none; }
+    .o-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: calc(2px * var(--k)) 0; }
+    .o-label { color: #a8a397; font-size: calc(11px * var(--k)); white-space: nowrap; flex-shrink: 0; }
     .o-value {
-      font-weight: 600; color: #ffd700; font-size: 12px;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px;
+      font-weight: 600; color: #ffd700; font-size: calc(12px * var(--k));
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .o-value.dim { color: #cfc9bd; font-weight: 400; }
+    .o-dim {
+      color: #a8a397; font-size: calc(10px * var(--k));
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: calc(1px * var(--k)) 0;
+    }
+    .up { color: #8ec07c; }
+    .down { color: #d9534f; }
+    .o-list { padding: calc(1px * var(--k)) 0; }
+    .o-line {
+      font-size: calc(11px * var(--k)); color: #e6e0d4;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      padding: calc(1.5px * var(--k)) 0;
+    }
+    .o-line .lq { color: #ffd700; font-weight: 600; }
+    .o-line .done { color: #8a8578; text-decoration: line-through; }
+    .o-line .failed { color: #d9534f; text-decoration: line-through; }
+    .o-flag { color: #e06c75; }
+    .o-kappa { color: #ffd700; font-weight: 700; }
+    .o-bad { color: #ffb464; }
+    .o-more { color: #a8a397; font-size: calc(10px * var(--k)); }
   </style>
 </head>
 <body>
   <div id="cursor-overlay" class="cursor-overlay hidden">
     <div class="o-header">
       <div id="overlay-icon" class="o-icon"></div>
-      <h3 id="overlay-name" class="o-name placeholder">Item…</h3>
+      <div>
+        <h3 id="overlay-name" class="o-name placeholder">Objet…</h3>
+        <div id="overlay-sub" class="o-sub hidden"></div>
+      </div>
     </div>
-    <div class="o-body">
-      <div class="o-row">
-        <span class="o-label">Flea</span>
-        <span id="overlay-flea" class="o-value">—</span>
+    <div class="o-body" id="overlay-body">
+      <!-- Flea -->
+      <div class="o-sec" data-sec="flea">
+        <div class="o-row">
+          <span class="o-label">Flea</span>
+          <span class="o-value"><span id="overlay-flea">—</span> <span id="flea-trend"></span></span>
+        </div>
       </div>
-      <div class="o-row">
-        <span id="overlay-trader-label" class="o-label">Vendeur</span>
-        <span id="overlay-trader" class="o-value">—</span>
+      <div class="o-dim" data-sec="flea_history" id="overlay-flea-history"></div>
+      <!-- Meilleur marchand -->
+      <div class="o-sec" data-sec="traders">
+        <div class="o-row">
+          <span id="overlay-trader-label" class="o-label">Meilleur</span>
+          <span id="overlay-trader" class="o-value">—</span>
+        </div>
       </div>
-      <div class="o-row">
-        <span class="o-label">Slot</span>
-        <span id="overlay-slot" class="o-value">—</span>
+      <div class="o-dim" data-sec="traders_all" id="overlay-traders-all"></div>
+      <!-- Prix par emplacement (+ /kg) -->
+      <div class="o-sec" data-sec="slot">
+        <div class="o-row">
+          <span class="o-label">Slot</span>
+          <span id="overlay-slot" class="o-value">—</span>
+        </div>
       </div>
-      <div class="o-row">
-        <span class="o-label">Quête</span>
-        <span id="overlay-quest" class="o-value dim">—</span>
+      <div class="o-dim o-caliber" data-sec="caliber" id="overlay-caliber"></div>
+      <!-- Quêtes -->
+      <div class="o-sec" data-sec="quests" id="sec-quests">
+        <div class="o-row"><span class="o-label">Quête</span></div>
+        <div class="o-list" id="overlay-quest-list"></div>
       </div>
-      <div class="o-row" id="overlay-barter-row" hidden>
-        <span id="overlay-barter-label" class="o-label">Barter</span>
-        <span id="overlay-barter-value" class="o-value dim">—</span>
+      <!-- Barter : l'obtenir -->
+      <div class="o-sec" data-sec="barter" id="sec-barter">
+        <div class="o-row"><span class="o-label">Barter</span></div>
+        <div class="o-list" id="overlay-barter-list"></div>
       </div>
-      <div class="o-row" id="overlay-craft-row" hidden>
-        <span id="overlay-craft-label" class="o-label">Craft</span>
-        <span id="overlay-craft-value" class="o-value dim">—</span>
+      <!-- Barter : où DÉPENSER l'objet -->
+      <div class="o-sec" data-sec="barter_using" id="sec-barter-using">
+        <div class="o-row"><span class="o-label">Échangé</span></div>
+        <div class="o-list" id="overlay-barter-using-list"></div>
       </div>
-      <div class="o-row" id="overlay-raw-row">
-        <span class="o-label">Lu</span>
-        <span id="overlay-raw" class="o-value dim">—</span>
+      <!-- Planque (améliorations requises) -->
+      <div class="o-sec" data-sec="hideout" id="sec-hideout">
+        <div class="o-row"><span class="o-label">Planque</span></div>
+        <div class="o-list" id="overlay-hideout-list"></div>
+      </div>
+      <!-- Craft (recettes qui le produisent) -->
+      <div class="o-sec" data-sec="crafts" id="sec-crafts">
+        <div class="o-row"><span class="o-label">Craft</span></div>
+        <div class="o-list" id="overlay-craft-list"></div>
+      </div>
+      <!-- Achat marchand (off par défaut) -->
+      <div class="o-sec" data-sec="buy" id="sec-buy">
+        <div class="o-row"><span class="o-label">Acheter</span><span id="overlay-buy" class="o-value">—</span></div>
+      </div>
+      <!-- Texte brut lu par l'OCR (off par défaut) -->
+      <div class="o-sec" data-sec="raw">
+        <div class="o-row">
+          <span class="o-label">Lu</span>
+          <span id="overlay-raw" class="o-value dim">—</span>
+        </div>
       </div>
     </div>
   </div>
@@ -110,6 +172,9 @@
   let isVisible = false;
   let lastSeq = 0;
   let hideTimer = null;
+  // Sections par défaut : tout visible sauf « Acheter » et « Lu » (discrets).
+  const DEFAULT_SECTIONS = { flea: 1, flea_history: 1, traders: 1, traders_all: 1, slot: 1, quests: 1, barter: 1, barter_using: 1, hideout: 1, crafts: 1, buy: 0, raw: 0 };
+  let cfg = { opacity: 0.95, scale: 1, sections: Object.assign({}, DEFAULT_SECTIONS) };
 
   function fitWindow() {
     if (!invoke) return;
@@ -123,8 +188,6 @@
     $("cursor-overlay").classList.remove("hidden");
     // set_size réaffiche la fenêtre côté Windows : c'est voulu ici, la carte
     // est en train d'apparaître. On ne l'appelle donc jamais depuis hide().
-    // Indispensable aussi quand le contenu change de hauteur (barter/craft),
-    // sinon la carte serait coupée par une fenêtre trop petite.
     fitWindow();
   }
   function hide() {
@@ -137,55 +200,224 @@
   }
   function forceHide() {
     if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
-    isVisible = false;
+    if (isVisible) { isVisible = false; if (invoke) invoke("hide_overlay").catch(() => {}); }
     $("cursor-overlay").classList.add("hidden");
-    if (invoke) invoke("hide_overlay").catch(() => {});
   }
-  function formatPrice(p) { return (p == null || p === 0) ? "—" : new Intl.NumberFormat(navigator.language || "fr-FR").format(p) + " ₽"; }
-  function formatSlot(p, w) { const wt = w || 1; return (p == null || !wt) ? "—" : new Intl.NumberFormat(navigator.language || "fr-FR").format(Math.floor(p / wt)) + " ₽"; }
-  function truncate(s, n) { return s && s.length > n ? s.substring(0, n) + "…" : s; }
+
+  /* ---------- Formatage (style Tarkov : nombre + ₽) ---------- */
+  const NF = () => new Intl.NumberFormat(navigator.language || "fr-FR");
+  function fmtP(p) { return (p == null || p === 0) ? "—" : NF().format(Math.round(p)) + " ₽"; }
+  /** Format compact des listes secondaires : 22 000 → 22 k. */
+  function fmtK(p) {
+    if (p == null) return "—";
+    const n = Math.round(p);
+    return n >= 100000 ? Math.round(n / 1000).toLocaleString() + " k"
+      : n >= 10000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + " k"
+      : n.toLocaleString();
+  }
+  function fmtSlot(p, w, h) { const slots = Math.max(1, (w || 1) * (h || 1)); return (p == null || !slots) ? "—" : NF().format(Math.floor(p / slots)) + " ₽"; }
+  function fmtKg(p, kg) { return (p == null || !kg) ? "" : NF().format(Math.floor(p / kg)) + " ₽/kg"; }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+  function truncate(s, n) { s = String(s || ""); return s.length > n ? s.substring(0, n) + "…" : s; }
+
+  /* ---------- Configuration (fenêtre + sections + style) ---------- */
+  function applyCfg(c) {
+    if (!c) return;
+    const root = $("cursor-overlay");
+    if (typeof c.opacity === "number" && c.opacity > 0 && c.opacity <= 1) {
+      root.style.setProperty("--bg-a", String(c.opacity));
+    }
+    if (typeof c.scale === "number" && c.scale >= 0.7 && c.scale <= 2) {
+      root.style.setProperty("--k", String(c.scale));
+    }
+    if (c.sections && typeof c.sections === "object") {
+      // Les clés ABSENTES du payload tombent sur le défaut persisté : le
+      // backend ne renvoie JAMAIS une section inventée.
+      for (const k of Object.keys(DEFAULT_SECTIONS)) {
+        cfg.sections[k] = typeof c.sections[k] === "boolean" ? (c.sections[k] ? 1 : 0) : cfg.sections[k];
+      }
+    }
+    // Visibilité immédiate des sections (aucun contenu réécrit).
+    document.querySelectorAll("[data-sec]").forEach((el) => {
+      const key = el.getAttribute("data-sec");
+      if (key in cfg.sections) el.hidden = !cfg.sections[key];
+    });
+  }
+
+  /* ---------- Rendu des données ---------- */
+  function trend(pct) {
+    const el = $("flea-trend");
+    if (!el) return;
+    if (typeof pct !== "number" || !isFinite(pct)) { el.textContent = ""; return; }
+    const p = Math.abs(pct) < 0.05 ? 0 : pct;
+    const cls = p > 0 ? "up" : p < 0 ? "down" : "";
+    el.innerHTML = cls
+      ? `<span class="${cls}">${p > 0 ? "↗" : "↘"} ${Math.abs(p).toFixed(1)}%</span>`
+      : "";
+  }
+
+  function questLine(t) {
+    if (!t || !t.name) return "";
+    const st = t.task_status;
+    const nameCls = st === "completed" ? " done " : st === "failed" ? " failed " : " lq ";
+    const bits = [];
+    if (typeof t.count === "number" && t.count > 1) bits.push("×" + t.count);
+    if (t.fir) bits.push(`<span class="o-flag" title="Found in Raid requis">⚑</span>`);
+    if (t.kappa_required) bits.push(`<span class="o-kappa" title="Requis pour Kappa">κ</span>`);
+    if (st === "completed") bits.push(`<span class="done">✓</span>`);
+    if (st === "failed") bits.push(`<span class="failed">✗</span>`);
+    const lab = t.trader ? `<span class="o-sub">${esc(t.trader)}</span> ` : "";
+    return `<div class="o-line">${lab}<span class="${nameCls}">${esc(truncate(t.name, 26))}</span> ${bits.join(" ")}</div>`;
+  }
+
+  function barterLine(b) {
+    if (!b) return "";
+    const items = (b.items || []).map((i) => (i.count || 1) + "× " + esc(truncate(i.name, 18))).join(" + ");
+    return `<div class="o-line"><span class="lq">${esc(b.trader)}</span> niv${b.level ?? 1} ${items ? ": " + items : ""}</div>`;
+  }
+
+  function barterUsingLine(b) {
+    if (!b) return "";
+    const rw = (b.rewards || []).map((i) => (i.count || 1) + "× " + esc(truncate(i.name, 20))).join(" + ");
+    return `<div class="o-line">→ <span class="lq">${esc(b.trader)}</span> niv${b.level ?? 1} ${rw ? ": " + rw : ""}</div>`;
+  }
+
+  function hideoutLines(list) {
+    const max = 3;
+    const shown = (list || []).slice(0, max);
+    const lines = shown.map((h) => {
+      if (!h) return "";
+      const fir = h.fir ? ` <span class="o-flag">⚑</span>` : "";
+      return `<div class="o-line">${esc(truncate(h.station, 20))} niv${h.level ?? 1} — ${h.count}×${fir}</div>`;
+    }).filter(Boolean);
+    if ((list || []).length > max) lines.push(`<div class="o-more">+${list.length - max} autres…</div>`);
+    return lines.join("");
+  }
+
+  function craftLine(c, extraCount) {
+    if (!c) return "";
+    const items = (c.items || []).map((i) => (i.count || 1) + "× " + esc(truncate(i.name, 18))).join(" + ");
+    const dur = c.duration_sec ? "~" + Math.max(1, Math.round(c.duration_sec / 3600)) + "h" : "";
+    const more = extraCount > 0 ? ` +${extraCount}` : "";
+    return `<div class="o-line"><span class="lq">${esc(truncate(c.station, 16))}</span> niv${c.level ?? 1} ${dur}${more}</div>` +
+           (items ? `<div class="o-line o-sub">← ${items}</div>` : "");
+  }
+
+  function tradersAll(sell_for, bestName) {
+    const others = (sell_for || []).filter((s) => s && s.name !== bestName).slice(0, 4);
+    if (!others.length) return "";
+    return others.map((s) => `${esc(truncate(s.name, 12))} ${fmtK(s.price)}`).join(" · ");
+  }
+
+  /** Efface TOUTES les données : état neutre autorisé avant la prochaine valeur. */
+  function clearData() {
+    const ids = ["overlay-flea", "flea-trend", "overlay-flea-history", "overlay-trader", "overlay-traders-all",
+      "overlay-slot", "overlay-caliber", "overlay-quest-list", "overlay-barter-list", "overlay-barter-using-list",
+      "overlay-hideout-list", "overlay-craft-list", "overlay-buy", "overlay-raw", "overlay-sub"];
+    ids.forEach((id) => { const el = $(id); if (el) el.innerHTML = ""; });
+    $("overlay-caliber").textContent = "";
+    ["sec-quests", "sec-barter", "sec-barter-using", "sec-hideout", "sec-crafts"].forEach((id) => { $(id).hidden = true; });
+  }
+
+  function renderResult(d) {
+    d = d || {};
+    applyCfg(d.cfg);
+    const hasItem = !!(d.item_name || d.short_name);
+    const n = d.item_name || d.short_name || (d.raw_text ? d.raw_text.trim() : "");
+    $("overlay-name").textContent = n ? truncate(n, 30) : (hasItem ? "" : "Objet non reconnu");
+    $("overlay-name").classList.toggle("placeholder", !d.item_name && !d.short_name);
+    $("overlay-icon").style.backgroundImage = d.icon ? "url(\"" + d.icon + "\")" : "";
+    // Sous-titre : calibre/ammo pack/quelle info utile
+    const sub = $("overlay-sub");
+    const subBits = [];
+    if (d.caliber_display) subBits.push("⌖ " + esc(d.caliber_display));
+    if (d.ammo_pack_round_name) subBits.push(esc(truncate(d.ammo_pack_round_name, 22)));
+    if (d.weight) subBits.push(esc(d.weight) + " kg");
+    sub.className = "o-sub" + (subBits.length ? "" : " hidden");
+    sub.innerHTML = subBits.join(" · ");
+
+    const r = d; // result aliases
+    $("overlay-flea").textContent = fmtP(r.flea_price);
+    trend(r.flea_change_48h_pct);
+    const hist = [];
+    if (r.flea_low_24h != null || r.flea_high_24h != null) {
+      hist.push("24h " + fmtK(r.flea_low_24h) + " – " + fmtK(r.flea_high_24h));
+    }
+    if (r.flea_last_offer_count != null) hist.push(r.flea_last_offer_count + " offres");
+    $("overlay-flea-history").textContent = hist.join(" · ");
+
+    // Meilleur marchand : sell_for trie déjà du plus haut au plus bas.
+    const best = Array.isArray(r.sell_for) && r.sell_for.length ? r.sell_for[0] : null;
+    $("overlay-trader-label").textContent = best ? "Meilleur" : "Marchand";
+    $("overlay-trader").textContent = best
+      ? `${esc(best.name)} — ${fmtP(best.price)}`
+      : fmtP(r.trader_price);
+    $("overlay-traders-all").textContent = best ? tradersAll(r.sell_for, best.name) : "";
+
+    $("overlay-slot").textContent = fmtSlot(r.flea_price, r.width, r.height);
+    $("overlay-caliber").textContent = d.caliber_display ? "⌖ " + esc(d.caliber_display) : "";
+
+    const q = (r.used_in_tasks || []).filter(Boolean);
+    $("sec-quests").hidden = !cfg.sections.quests || !q.length;
+    if (q.length) {
+      const max = 3;
+      $("overlay-quest-list").innerHTML = q.slice(0, max).map(questLine).join("") +
+        (q.length > max ? `<div class="o-more">+${q.length - max} autres…</div>` : "");
+    }
+
+    const br = (r.barters_for || []).filter(Boolean);
+    $("sec-barter").hidden = !cfg.sections.barter || !br.length;
+    if (br.length) {
+      $("overlay-barter-list").innerHTML = barterLine(br[0]) +
+        (br.length > 1 ? `<div class="o-more">+${br.length - 1} autres…</div>` : "");
+    }
+
+    const bu = (r.barters_using || []).filter(Boolean);
+    $("sec-barter-using").hidden = !cfg.sections.barter_using || !bu.length;
+    if (bu.length) $("overlay-barter-using-list").innerHTML = barterUsingLine(bu[0]);
+
+    const hd = (r.needed_for_hideout || []).filter(Boolean);
+    $("sec-hideout").hidden = !cfg.sections.hideout || !hd.length;
+    if (hd.length) $("overlay-hideout-list").innerHTML = hideoutLines(hd);
+
+    const cf = (r.crafts_for || []).filter(Boolean);
+    $("sec-crafts").hidden = !cfg.sections.crafts || !cf.length;
+    if (cf.length) $("overlay-craft-list").innerHTML = craftLine(cf[0], cf.length - 1);
+
+    const bf = (r.buy_for || []).filter(Boolean);
+    if (bf.length) {
+      $("overlay-buy").textContent = `${esc(bf[0].name)} niv${bf[0].min_level ?? 1} — ${fmtP(bf[0].price)}`;
+    } else { $("overlay-buy").textContent = "—"; }
+
+    $("overlay-raw").textContent = truncate((r.raw_text || "").trim() || "—", 44);
+    show();
+    fitWindow();
+  }
+
+  function renderInfo(msg, secs) {
+    // Message court sur la carte (mode auto, infos) sans données d'objet faux.
+    $("overlay-name").textContent = truncate(msg || "", 30);
+    $("overlay-name").classList.add("placeholder");
+    $("overlay-icon").style.backgroundImage = "";
+    $("overlay-sub").className = "o-sub hidden";
+    clearData();
+    $("overlay-flea").textContent = "—";
+    $("overlay-trader").textContent = "—";
+    $("overlay-slot").textContent = "—";
+    show();
+    fitWindow();
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    if ((secs || 3) > 0) hideTimer = setTimeout(hide, (secs || 3) * 1000);
+  }
 
   function showLoading() {
     $("overlay-name").textContent = "Lecture…";
     $("overlay-name").classList.add("placeholder");
     $("overlay-icon").style.backgroundImage = "";
-    $("overlay-flea").textContent = $("overlay-trader").textContent = $("overlay-slot").textContent = $("overlay-quest").textContent = "—";
-    $("overlay-raw").textContent = "—";
-    $("overlay-barter-row").hidden = true; $("overlay-craft-row").hidden = true;
-    show();
-    fitWindow();
-  }
-
-  function renderResult(d) {
-    d = d || {};
-    const n = d.item_name || (d.raw_text ? d.raw_text.trim() : "");
-    $("overlay-name").textContent = n ? truncate(n, 30) : ((d.raw_text || "").trim() || "Rien reconnu");
-    $("overlay-name").classList.toggle("placeholder", !n && !d.raw_text);
-    $("overlay-flea").textContent = formatPrice(d.flea_price);
-    $("overlay-trader").textContent = formatPrice(d.trader_price);
-    $("overlay-trader-label").textContent = d.trader_price != null ? "Vendeur" : "Base";
-    $("overlay-slot").textContent = formatSlot(d.flea_price, (d.width || 1) * (d.height || 1));
-
-    let q = "—";
-    if (Array.isArray(d.used_in_tasks) && d.used_in_tasks.length > 0) q = d.used_in_tasks.map(t => t && t.name).filter(Boolean).join(", ");
-    $("overlay-quest").textContent = truncate(q, 34);
-
-    if (Array.isArray(d.barters_for) && d.barters_for.length > 0) {
-      const b = d.barters_for[0] || {};
-      $("overlay-barter-label").textContent = b.trader || "Barter";
-      $("overlay-barter-value").textContent = "Niv. " + b.level + " : " + (b.items||[]).map(i=>i.count+"× "+i.name).join(" + ");
-      $("overlay-barter-row").hidden = false;
-    } else { $("overlay-barter-row").hidden = true; }
-
-    if (Array.isArray(d.needed_for_hideout) && d.needed_for_hideout.length > 0) {
-      const h = d.needed_for_hideout[0] || {};
-      $("overlay-craft-label").textContent = h.station || "Planque";
-      $("overlay-craft-value").textContent = "Niv. " + h.level + " : " + h.count + "×";
-      $("overlay-craft-row").hidden = false;
-    } else { $("overlay-craft-row").hidden = true; }
-
-    $("overlay-icon").style.backgroundImage = d.icon ? "url(\"" + d.icon + "\")" : "";
-    $("overlay-raw").textContent = truncate((d.raw_text || "").trim() || "—", 44);
+    $("overlay-sub").className = "o-sub hidden";
+    clearData();
+    $("overlay-flea").textContent = $("overlay-trader").textContent = $("overlay-slot").textContent = "—";
+    $("overlay-raw").textContent = "";
     show();
     fitWindow();
   }
@@ -194,9 +426,10 @@
     $("overlay-name").textContent = truncate(msg || "Erreur de lecture", 30);
     $("overlay-name").classList.remove("placeholder");
     $("overlay-icon").style.backgroundImage = "";
-    $("overlay-flea").textContent = $("overlay-trader").textContent = $("overlay-slot").textContent = $("overlay-quest").textContent = "—";
-    $("overlay-raw").textContent = "—";
-    $("overlay-barter-row").hidden = true; $("overlay-craft-row").hidden = true;
+    $("overlay-sub").className = "o-sub hidden";
+    clearData();
+    $("overlay-flea").textContent = $("overlay-trader").textContent = $("overlay-slot").textContent = "—";
+    $("overlay-raw").textContent = "";
     show();
     fitWindow();
     if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
@@ -216,25 +449,36 @@
       lastSeq = seq;
 
       const status = data.status || "";
-      if (status === "loading") {
+      if (status === "config") {
+        applyCfg(data.cfg);
+        if (isVisible) fitWindow(); // les sections/échelles changent la hauteur
+      } else if (status === "loading") {
+        applyCfg(data.cfg);
         if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
         showLoading();
       } else if (status === "ok") {
-        renderResult(data.result);
+        applyCfg(data.cfg);
+        renderResult(data.result || {});
         if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
-        const secs = data.autohide || 8;
+        const secs = data.autohide || 0;
         if (secs > 0) hideTimer = setTimeout(hide, secs * 1000);
       } else if (status === "show") {
         show();
         if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
         const secs = data.autohide || 0;
         if (secs > 0) hideTimer = setTimeout(hide, secs * 1000);
+      } else if (status === "auto-on") {
+        renderInfo("Mode auto : activé", data.autohide || 3);
+      } else if (status === "auto-off") {
+        renderInfo("Mode auto : désactivé", data.autohide || 3);
+      } else if (status === "hide") {
+        forceHide();
       } else if (status === "error") {
         showError(data.message || "Erreur de lecture", data.autohide);
       } else if (status === "not-in-game") {
         showError("Lance Tarkov d'abord", data.autohide || 4);
       }
-    } catch(e) {}
+    } catch (e) {}
   }
 
   setInterval(poll, 200);

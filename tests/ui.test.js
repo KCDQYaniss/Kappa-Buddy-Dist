@@ -222,11 +222,14 @@ const emit = (n, payload) => handlers[n]({ payload });
   emit("task", { id: a, status: "started" });
   await wait(30);
   ok(stateOf(a) === "started", "quête démarrée détectée dans les logs");
-  ok(TT.mapview.current().questEntries.length === 2, "ses 2 objectifs apparaissent sur la carte");
+  // Règle v0.9.13 : un marqueur de quête n'apparaît que pour un objectif avec
+  // localisation GÉOGRAPHIQUE FIXE (zone, position imposée, sortie). L'objectif
+  // « shot sans zone » de ce fixture ne dessine donc pas de marqueur.
+  ok(TT.mapview.current().questEntries.length === 1, "l'objectif avec lieu fixe apparaît sur la carte (règle marqueurs = lieux fixes)");
   ok(!!TT.mapview.current().questGroup, "calque de quêtes dessiné");
   ok(/Début du tournage/.test(d.getElementById("map-side").innerHTML), "quête listée dans la barre latérale");
   const side = d.getElementById("map-side");
-  ok(side.querySelectorAll(".qgroup").length === 1 && side.querySelectorAll(".qgroup .qobj").length === 2, "une seule entrée pour la quête, avec ses 2 objectifs en liste");
+  ok(side.querySelectorAll(".qgroup").length === 1 && side.querySelectorAll(".qgroup .qobj").length === 1, "une seule entrée pour la quête, ses objectifs géolocalisés en liste");
   ok(!side.querySelector(".qrow"), "plus de boîte par objectif");
   const show = side.querySelector("[data-qshow]"); show.checked = false; show.dispatchEvent(new w.Event("change", { bubbles: true }));
   ok(!TT.mapview.current().questGroup && !!side.querySelector(".qgroup.off"), "quête masquée : plus dessinée sur la carte, mais toujours listée");
@@ -239,10 +242,12 @@ const emit = (n, payload) => handlers[n]({ payload });
   ok(!side.querySelector(".qgroup.closed"), "quête dépliée");
   side.querySelector("[data-qzoom]").click();
   side.querySelector("[data-qdone]").click();
-  ok(TT.mapview.current().questEntries.length === 1, "✓ sur un objectif : il disparaît de la liste et de la carte");
+  ok(TT.mapview.current().questEntries.length === 0, "✓ sur l'objectif : il disparaît de la liste de la carte");
   emit("task", { id: a, status: "finished" });
   await wait(30);
-  ok(stateOf(a) === "finished" && stateOf(b) === "started", "terminer une quête débloque → la suivante passe à 'started'");
+  // Sémantique v0.9.13+ : terminer une quête rend ses dépendées DISPONIBLES
+  // (prérequis remplis), mais ne les marque jamais « started » sans log/choix.
+  ok(stateOf(a) === "finished" && stateOf(b) === "locked" && TT.store.availabilityOf(b) === "available", "terminer une quête débloque la suivante : disponible, pas auto-'started'");
   ok(TT.mapview.current().questEntries.length === 0, "plus d'objectif affiché pour une quête terminée");
 
   await TT.store.rescan(true);
@@ -260,7 +265,7 @@ const emit = (n, payload) => handlers[n]({ payload });
   ok(d.querySelectorAll("#q-list .qitem").length === 2, "filtre par marchand");
   d.querySelector('#q-traders [data-trader="all"]').click();
   d.querySelector('#q-states [data-state="started"]').click();
-  ok(d.querySelectorAll("#q-list .qitem").length === 4, "filtre 'started' = quêtes non verrouillées (3 sans prérequis + b débloqué)");
+  ok(d.querySelectorAll("#q-list .qitem").length === 1, "filtre 'started' = quêtes réellement commencées (b, resynchronisée par l'historique)");
   d.querySelector('#q-states [data-state="all"]').click();
   d.querySelector(`#q-list [data-id="${b}"]`).click();
   ok(/Débarrasser la zone/.test(d.getElementById("q-detail").innerHTML), "détail de la quête");

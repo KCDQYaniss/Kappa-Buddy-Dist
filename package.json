@@ -1,6 +1,6 @@
 {
   "name": "tarkov-tracker",
-  "version": "0.9.14",
+  "version": "0.9.15",
   "private": true,
   "scripts": {
     "maps": "python3 tools/prepare_maps.py || python tools/prepare_maps.py",
@@ -12,7 +12,7 @@
     "verify-release": "node tools/verify-published.js",
     "zip": "node tools/zip.js",
     "audit": "node tools/audit.js",
-    "test": "cargo test -p tarkov-core && node tests/release.test.js && node tests/geo.test.js && node tests/maps.test.js && node tests/ui.test.js && node tests/cp.test.js && node tests/outage.test.js && node tests/sync.test.js"
+    "test": "cargo test -p tarkov-core && node tests/release.test.js && node tests/geo.test.js && node tests/maps.test.js && node tests/ui.test.js && node tests/cp.test.js && node tests/outage.test.js && node tests/sync.test.js && node tests/overlay-card.test.js && cargo test -p tarkov-tracker"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

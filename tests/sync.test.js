@@ -55,7 +55,7 @@ async function boot({ logsDir = "C:/L", report = { events: [], files: 2, session
   ok(h.d.getElementById("badge-q").textContent === "> 1" && !h.d.getElementById("badge-q").hidden, "badge vert : 1 quête en cours");
   ok(/Quêtes · /.test(h.d.getElementById("sync-note").textContent), "barre du bas : dernière synchro");
   h.d.querySelector('[data-view="quests"]').click();
-  ok(h.d.querySelectorAll("#q-list .qitem").length === 3 && /Débarrasser/.test(h.d.getElementById("q-list").textContent), "la liste s'ouvre sur les quêtes en cours (débloquées et non terminées)");
+  ok(h.d.querySelectorAll("#q-list .qitem").length === 1 && /Débarrasser/.test(h.d.getElementById("q-list").textContent), "la liste s'ouvre sur les quêtes réellement en cours (celles démarrées dans les logs, et rien d'autre)");
   ok(/Ta progression/.test(h.d.getElementById("q-detail").textContent) && /2 \/ 7/.test(h.d.getElementById("q-detail").textContent), "tableau de bord : 2 quêtes terminées sur 7");
   ok(/Activité récente/.test(h.d.getElementById("q-detail").textContent) && /Quête terminée/.test(h.d.getElementById("q-detail").textContent), "fil d'activité récente");
 
@@ -98,12 +98,14 @@ async function boot({ logsDir = "C:/L", report = { events: [], files: 2, session
 
   console.log("Niveau du joueur");
   h = await boot();
-  ok(h.state(C) === "started", "quête de niveau 2 sans prérequis : en cours");
+  // Sémantique v0.9.13+ : une quête disponible (niveau ok, prérequis remplis)
+  // n'est PAS "en cours" tant que ni les logs ni l'utilisateur ne la démarrent.
+  ok(h.state(C) === "locked" && h.st.availabilityOf(h.st.S.idx.tasks[C]) === "available", "quête de niveau 2 sans prérequis : disponible, mais pas 'en cours'");
   h.st.setLevel(1);
   ok(h.state(C) === "locked" && /Niveau 2 requis/.test(h.st.lockReason(h.st.S.idx.tasks[C])), "niveau 1 : verrouillée, avec la raison");
   h.d.querySelector('[data-view="quests"]').click();
   const lv = h.d.getElementById("q-level"); lv.value = "5"; lv.dispatchEvent(new h.w.Event("change"));
-  ok(h.st.S.progress.level === 5 && h.state(C) === "started", "champ « Niveau » : quête débloquée passe à 'started'");
+  ok(h.st.S.progress.level === 5 && h.state(C) === "locked" && h.st.availabilityOf(h.st.S.idx.tasks[C]) === "available", "champ « Niveau » : la quête débloquée devient disponible (jamais auto-'started')");
   h.d.querySelector('#q-states [data-state="all"]').click();
   h.d.querySelector(`#q-list [data-id="${E}"]`).click();
   ok(/Prérequis : Débarrasser la zone/.test(h.d.getElementById("q-detail").textContent), "quête verrouillée : prérequis manquants listés");
@@ -137,11 +139,14 @@ async function boot({ logsDir = "C:/L", report = { events: [], files: 2, session
   ok(h.d.getElementById("q-sync").classList.contains("warn") && /introuvable/.test(h.d.getElementById("q-sync").textContent), "erreur de lecture : affichée dans le bandeau");
 
   console.log("Carte : une entrée par quête, masquable");
-  h = await boot({ report: { events: [{ id: B, status: "started", at: now - 2000 }, { id: C, status: "started", at: now - 1000 }], files: 1, sessions: 1 } });
+  // A et F fournissent des lieuS FIXES sur Customs (zone visitée / questItem avec
+  // positions) — C est une collecte générique : depuis v0.9.13 elle ne dessine
+  // aucun marqueur et reste dans l'onglet Quêtes.
+  h = await boot({ report: { events: [{ id: A, status: "started", at: now - 2000 }, { id: F, status: "started", at: now - 1000 }], files: 1, sessions: 1 } });
   h.handlers.map({ payload: { raw: "bigmap", slug: "customs" } });
   await wait(30);
   const side = h.d.getElementById("map-side");
-  ok(side.querySelectorAll(".qgroup").length === 2, "2 quêtes en cours sur Customs = 2 entrées (pas une boîte par objectif)");
+  ok(side.querySelectorAll(".qgroup").length === 2, "2 quêtes en cours avec lieu fixe sur Customs = 2 entrées (pas une boîte par objectif)");
   ok(/Quêtes de la map\s*2/.test(side.querySelector(".sec h3 em") ? side.textContent.replace(/\s+/g, " ") : ""), "le nombre de quêtes est affiché");
   ok(!!h.TT.mapview.current().questGroup, "objectifs dessinés");
   side.querySelector('[data-act="qhideall"]').click();

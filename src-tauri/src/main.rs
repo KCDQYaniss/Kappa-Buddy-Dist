@@ -7,7 +7,7 @@ mod priority;
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering as AtomicOrdering};
 use std::sync::Mutex;
 use tarkov_core::{self as core, paths, Config, Event, MapInfo, Position};
 use tauri::menu::{Menu, MenuItem};
@@ -59,6 +59,29 @@ struct Settings {
     /// Durée d'affichage de la carte après une capture, en secondes (0 = reste affichée).
     #[serde(default)]
     overlay_autohide_sec: Option<u32>,
+    /// Échelle du texte de la carte (1.0 = taille de référence, 0.7 → 2.0).
+    #[serde(default)]
+    overlay_text_scale: Option<f64>,
+    /// Coin de l'écran où se colle la carte : "TL" (défaut), "TR", "BL", "BR".
+    #[serde(default)]
+    overlay_anchor: Option<String>,
+    /// Sections de la carte laissées visibles. Absent = défaut :
+    /// tout sauf « Acheter » et « texte lu ».
+    #[serde(default)]
+    overlay_sections: Option<Vec<String>>,
+    /// Corrections OCR mémorisées : texte lu (en minuscules) → nom officiel.
+    #[serde(default)]
+    overlay_corrections: std::collections::HashMap<String, String>,
+    /// Mode « prix au survol » : captures automatiques uniquement quand Tarkov
+    /// est au premier plan, limitées par un seuil de déplacement du curseur.
+    #[serde(default)]
+    overlay_auto_enabled: bool,
+    /// Raccourci global qui bascule le mode automatique (vide = non lié).
+    #[serde(default)]
+    overlay_auto_hotkey: Option<String>,
+    /// Raccourci global qui masque immédiatement la carte (vide = non lié).
+    #[serde(default)]
+    overlay_hide_hotkey: Option<String>,
 }
 
 /// Normalise le mode de jeu reçu de l'interface.
@@ -103,6 +126,52 @@ impl Settings {
     fn overlay_sidecar_mode(&self) -> String {
         if self.mode() == "pve" { "pve".to_string() } else { "regular".to_string() }
     }
+    /// Opacité du FOND de la carte. 0 = réglage jamais enregistré → 0.95.
+    fn overlay_opacity(&self) -> f64 {
+        let v = self.cursor_overlay_opacity;
+        if !v.is_finite() || v <= 0.0 || v > 1.0 { 0.95 } else { v }
+    }
+    /// Échelle du texte de la carte, bornée au confort lisible.
+    fn overlay_text_scale(&self) -> f64 {
+        let v = self.overlay_text_scale.unwrap_or(1.0);
+        if !v.is_finite() || v < 0.7 || v > 2.0 { 1.0 } else { (v * 10.0).round() / 10.0 }
+    }
+    fn overlay_anchor(&self) -> String {
+        let a = self.overlay_anchor.as_deref().unwrap_or("TL").trim().to_ascii_uppercase();
+        if matches!(a.as_str(), "TL" | "TR" | "BL" | "BR") { a } else { "TL".to_string() }
+    }
+    fn overlay_auto_hotkey(&self) -> String {
+        self.overlay_auto_hotkey.clone().unwrap_or_default()
+    }
+    fn overlay_hide_hotkey(&self) -> String {
+        self.overlay_hide_hotkey.clone().unwrap_or_default()
+    }
+    /// Table `texteOCR → nom officiel` sérialisée pour le corps /lookup.
+    fn overlay_corrections_body(&self) -> Option<String> {
+        if self.overlay_corrections.is_empty() {
+            None
+        } else {
+            Some(serde_json::to_string(&self.overlay_corrections).unwrap_or_default())
+        }
+    }
+    /// Sections visibles de la carte, projeté en objet {clé: visible}.
+    /// Défaut : tout sauf « buy » (prix d'achat marchand) et « raw » (texte OCR).
+    fn overlay_sections_map(&self) -> serde_json::Value {
+        const ALL: [&str; 12] = [
+            "flea", "flea_history", "traders", "traders_all", "slot",
+            "quests", "barter", "barter_using", "hideout", "crafts", "buy", "raw",
+        ];
+        let on: Option<Vec<&str>> = self.overlay_sections.as_ref().map(|v| v.iter().map(|x| x.as_str()).collect());
+        let is_on = |k: &str| match &on {
+            Some(list) => list.iter().any(|s| *s == k),
+            None => !matches!(k, "buy" | "raw"),
+        };
+        let mut m = serde_json::Map::new();
+        for k in ALL {
+            m.insert(k.to_string(), serde_json::Value::Bool(is_on(k)));
+        }
+        serde_json::Value::Object(m)
+    }
 }
 
 #[derive(Default)]
@@ -114,15 +183,79 @@ struct AppState {
     warnings: Mutex<Vec<String>>,
 }
 
-/// Les deux raccourcis globaux de l'overlay. On garde le `Shortcut` déjà
+/// Les raccourcis globaux de l'overlay. On garde le `Shortcut` déjà
 /// analysé pour comparer par égalité dans le gestionnaire — ça évite toutes les
 /// ambiguïtés de format entre « Shift+F2 » et « shift+f2 ».
 #[derive(Default)]
 struct HotkeySlots {
     capture: Option<Shortcut>,
     toggle: Option<Shortcut>,
+    auto: Option<Shortcut>,
+    hide: Option<Shortcut>,
 }
 struct Hotkeys(Mutex<HotkeySlots>);
+
+/// Configuration d'affichage poussée à la carte (opacité du fond, échelle du
+/// texte, coin d'ancrage, sections visibles). Les captures l'attachent à chaque
+/// payload et un statut dédié « config » met la carte à jour sans toucher au
+/// contenu courant.
+fn build_overlay_cfg(s: &Settings) -> serde_json::Value {
+    serde_json::json!({
+        "opacity": s.overlay_opacity(),
+        "scale": s.overlay_text_scale(),
+        "anchor": s.overlay_anchor(),
+        "sections": s.overlay_sections_map(),
+    })
+}
+
+/* ---------- Mode « prix au survol » (optionnel) ----------
+ * PAS une boucle d'analyse : le sidecar coûte ~1s de CPU par lecture et
+ * l'OCR permanent en pleine partie est inacceptable. Chaque déclenchement du
+ * mode auto suit un déplacement RÉEL du curseur (seuil proportionnel à la
+ * résolution, façon échelle du tooltip EFT), filtré par un intervalle
+ * minimal. Arrêné → zéro capture. */
+static AUTO_ENABLED: AtomicBool = AtomicBool::new(false);
+static AUTO_LAST_FIRE_MS: AtomicU64 = AtomicU64::new(0);
+static AUTO_LAST_CURSOR: Mutex<Option<(i32, i32)>> = Mutex::new(None);
+static OVERLAY_LAST_STATUS_AT_MS: AtomicU64 = AtomicU64::new(0);
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// Le seuiil de déplacement (px) au-delà duquel on considère un nouvel objet.
+/// ~28px à 1080p, ~37 à 1440p, ~56 en 4K — au rayon d'un « objet de base ».
+fn auto_move_threshold() -> i32 {
+    let scale = (overlay::primary_monitor_width() as f64 / 1920.0).max(1.0);
+    (28.0 * scale).round() as i32
+}
+
+/// Décide si un déclenchement automatique vaut le coup : curseur déplacé de
+/// plus que le seuil (Manhattan) depuis la dernière capture automatique, et
+/// intervalle minimal de 1.5s garanti.
+fn auto_should_fire(cursor: (i32, i32)) -> bool {
+    if now_ms() - AUTO_LAST_FIRE_MS.load(AtomicOrdering::SeqCst) < 1500 {
+        return false;
+    }
+    let mut guard = match AUTO_LAST_CURSOR.try_lock() {
+        Ok(g) => g,
+        Err(_) => return false,
+    };
+    let last = *guard;
+    let moved = match last {
+        Some((x, y)) => (cursor.0 - x).abs() + (cursor.1 - y).abs(),
+        None => i32::MAX,
+    };
+    if moved < auto_move_threshold() {
+        return false;
+    }
+    *guard = Some(cursor);
+    AUTO_LAST_FIRE_MS.store(now_ms(), AtomicOrdering::SeqCst);
+    true
+}
 
 /// Dernier résultat d'overlay, interrogé par le frontend en polling.
 static LAST_OVERLAY_RESULT: Mutex<Option<serde_json::Value>> = Mutex::new(None);
@@ -132,9 +265,9 @@ static LAST_OVERLAY_STATUS: Mutex<String> = Mutex::new(String::new());
 /// « une seule fois puis plus rien » d'un flag booléen collé.
 static OVERLAY_SEQ: AtomicU64 = AtomicU64::new(0);
 
-/// (Re)enregistre les deux raccourcis globaux. Une chaîne vide libère le slot.
-/// Appelée au démarrage et à chaque enregistrement des réglages.
-fn apply_overlay_hotkeys(app: &AppHandle, capture: &str, toggle: &str) -> Result<(), String> {
+/// (Re)enregistre les raccourcis globaux de l'overlay. Une chaîne vide libère
+/// un slot. Appelé au démarrage et à chaque enregistrement des réglages.
+fn apply_overlay_hotkeys(app: &AppHandle, capture: &str, toggle: &str, auto: &str, hide: &str) -> Result<(), String> {
     let gs = app.global_shortcut();
     let state = app.state::<Hotkeys>();
     let mut cfg = state.0.lock().unwrap();
@@ -145,29 +278,89 @@ fn apply_overlay_hotkeys(app: &AppHandle, capture: &str, toggle: &str) -> Result
     if let Some(old) = cfg.toggle.take() {
         let _ = gs.unregister(old);
     }
-
-    if !capture.trim().is_empty() {
-        let parsed = capture
-            .parse::<Shortcut>()
-            .map_err(|e| format!("Raccourci de capture « {capture} » invalide : {e}"))?;
-        gs.register(parsed.clone())
-            .map_err(|e| format!("Impossible d'enregistrer le raccourci de capture « {capture} » : {e}"))?;
-        cfg.capture = Some(parsed);
+    if let Some(old) = cfg.auto.take() {
+        let _ = gs.unregister(old);
+    }
+    if let Some(old) = cfg.hide.take() {
+        let _ = gs.unregister(old);
     }
 
-    if !toggle.trim().is_empty() {
-        let parsed = toggle
-            .parse::<Shortcut>()
-            .map_err(|e| format!("Raccourci d'affichage « {toggle} » invalide : {e}"))?;
-        println!("[hotkey] registering toggle: {:?} (from {})", parsed, toggle);
-        match gs.register(parsed.clone()) {
-            Ok(()) => { cfg.toggle = Some(parsed); println!("[hotkey] toggle registered OK"); }
-            Err(e) => { println!("[hotkey] toggle registration FAILED: {e}"); return Err(format!("Impossible d'enregistrer le raccourci d'affichage « {toggle} » : {e}")); }
+    let register = |slot: &mut Option<Shortcut>, combo: &str, what: &str| -> Result<(), String> {
+        if combo.trim().is_empty() {
+            return Ok(());
         }
-    }
+        let parsed = combo
+            .parse::<Shortcut>()
+            .map_err(|e| format!("Raccourci {what} « {combo} » invalide : {e}"))?;
+        gs.register(parsed.clone())
+            .map_err(|e| format!("Impossible d'enregistrer le raccourci {what} « {combo} » : {e}"))
+            .map(|_| *slot = Some(parsed))
+    };
 
-    println!("[hotkey] capture=\"{capture}\" toggle=\"{toggle}\"");
+    register(&mut cfg.capture, capture, "de capture")?;
+    register(&mut cfg.toggle, toggle, "d'affichage")?;
+    register(&mut cfg.auto, auto, "du mode auto")?;
+    register(&mut cfg.hide, hide, "de masquage")?;
+
+    println!("[hotkey] capture=\"{capture}\" toggle=\"{toggle}\" auto=\"{auto}\" hide=\"{hide}\"");
     Ok(())
+}
+
+/// Active/désactive le mode « prix au survol ». Persistance immédiate pour que
+/// le choix survive à un redémarrage même sans passer par les réglages.
+fn set_overlay_auto(app: &AppHandle, on: bool) {
+    AUTO_ENABLED.store(on, AtomicOrdering::SeqCst);
+    if on {
+        // Réarmé : avec une mémoire de curseur vide, le premier tick passe le
+        // seuil (distance infinie) → la carte identifie l'objet déjà survolé.
+        AUTO_LAST_CURSOR.lock().unwrap().take();
+        AUTO_LAST_FIRE_MS.store(0, AtomicOrdering::SeqCst);
+    }
+    {
+        let st = app.state::<AppState>();
+        let mut s = st.settings.lock().unwrap();
+        s.overlay_auto_enabled = on;
+        let clone = s.clone();
+        drop(s);
+        let _ = save_settings_file(app, &clone);
+    }
+    // Retour visuel immédiat sur la carte : activé / désactivé, bref.
+    store_overlay(serde_json::json!({
+        "status": if on { "auto-on" } else { "auto-off" },
+        "autohide": 3,
+        "cfg": build_overlay_cfg(&app.state::<AppState>().settings.lock().unwrap()),
+    }));
+}
+
+/// Fil du mode auto : un seul réveil toutes les 900 ms, ZÉRO OCR s'il ne se
+/// passe rien (curseur immobile, Tarkov pas au premier plan, lecture en cours).
+/// Le vrai travail passe par le même chemin que la touche F2 : une capture
+/// one-shot, seq-gardée côté sidecar (les lectures périmées sont abandonnées).
+fn spawn_auto_loop(app: AppHandle) {
+    std::thread::spawn(move || {
+        println!("[overlay] auto loop started");
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(900));
+            if !AUTO_ENABLED.load(AtomicOrdering::SeqCst) {
+                continue;
+            }
+            if *LAST_OVERLAY_STATUS.lock().unwrap() == "loading" {
+                continue; // une lecture tourne déjà : on n'empile pas
+            }
+            if !overlay::is_tarkov_foreground() {
+                continue; // le whatever au premier plan n'est pas le jeu
+            }
+            // Une seule lecture par DÉPLACEMENT significatif du curseur.
+            let cursor = overlay::get_cursor_position();
+            if !auto_should_fire(cursor) {
+                continue;
+            }
+            let app2 = app.clone();
+            tauri::async_runtime::spawn(async move {
+                run_overlay_capture(&app2).await;
+            });
+        }
+    });
 }
 
 /// Stocke le résultat pour que le frontend le récupère par polling.
@@ -183,18 +376,27 @@ fn store_overlay(payload: serde_json::Value) {
     let mut s = LAST_OVERLAY_RESULT.lock().unwrap();
     *s = Some(payload);
     println!("[overlay] stored seq={seq} status={status}");
+    OVERLAY_LAST_STATUS_AT_MS.store(now_ms(), AtomicOrdering::SeqCst);
     let mut st = LAST_OVERLAY_STATUS.lock().unwrap();
     *st = status;
 }
 
-/// Capture + OCR + prix, déclenché par le raccourci ou par le bouton de test.
-/// L'ordre compte : on affiche d'abord l'état « lecture en cours » pour que
-/// l'appui sur la touche soit ressenti comme instantané, l'OCR prenant ~1s.
+/// Capture + OCR + prix, déclenché par le raccourci, le bouton de test ou le
+/// mode auto. L'ordre compte : on affiche d'abord l'état « lecture en cours »
+/// pour que l'appui sur la touche soit ressenti comme instantané, l'OCR prenant
+/// ~1s. Les réglages d'affichage (cfg) et les corrections OCR suivent chaque
+/// capture : la carte brieffée reste alignée sur les réglages courants.
 async fn run_overlay_capture(app: &AppHandle) {
-    let (lang, mode, autohide) = {
+    let (lang, mode, autohide, cfg, corrections) = {
         let st = app.state::<AppState>();
         let s = st.settings.lock().unwrap();
-        (s.overlay_game_lang(), s.overlay_sidecar_mode(), s.overlay_autohide_sec())
+        (
+            s.overlay_game_lang(),
+            s.overlay_sidecar_mode(),
+            s.overlay_autohide_sec(),
+            build_overlay_cfg(&s),
+            s.overlay_corrections_body(),
+        )
     };
 
     if !overlay::is_tarkov_foreground() {
@@ -205,6 +407,7 @@ async fn run_overlay_capture(app: &AppHandle) {
         store_overlay(serde_json::json!({
             "status": "not-in-game",
             "autohide": 4,
+            "cfg": cfg,
         }));
         return;
     }
@@ -212,9 +415,9 @@ async fn run_overlay_capture(app: &AppHandle) {
     // Cache avant de montrer - évite les doubles fenêtres ou résidus visuels
     let _ = overlay::hide_overlay_window(app);
     let _ = overlay::show_overlay_window(app);
-    store_overlay(serde_json::json!({ "status": "loading" }));
+    store_overlay(serde_json::json!({ "status": "loading", "cfg": cfg }));
 
-    match overlay::lookup_once(&lang, &mode).await {
+    match overlay::lookup_once(&lang, &mode, corrections).await {
         Ok(result) => {
             let has_item = result.get("item_name").map(|v| !v.is_null()).unwrap_or(false);
             println!("[overlay] lookup ok (item={has_item})");
@@ -222,6 +425,7 @@ async fn run_overlay_capture(app: &AppHandle) {
                 "status": "ok",
                 "result": result,
                 "autohide": autohide,
+                "cfg": cfg,
             }));
         }
         Err(e) => {
@@ -230,6 +434,7 @@ async fn run_overlay_capture(app: &AppHandle) {
                 "status": "error",
                 "message": e,
                 "autohide": autohide,
+                "cfg": cfg,
             }));
         }
     }
@@ -262,6 +467,13 @@ struct StateDto {
     overlay_toggle_hotkey: String,
     overlay_game_lang: String,
     overlay_autohide_sec: u32,
+    overlay_text_scale: f64,
+    overlay_anchor: String,
+    overlay_sections: Vec<String>,
+    overlay_corrections: std::collections::HashMap<String, String>,
+    overlay_auto_enabled: bool,
+    overlay_auto_hotkey: String,
+    overlay_hide_hotkey: String,
     map: Option<MapInfo>,
     position: Option<Position>,
     warnings: Vec<String>,
@@ -336,6 +548,18 @@ fn snapshot(st: &AppState) -> StateDto {
         overlay_toggle_hotkey: s.overlay_toggle_hotkey(),
         overlay_game_lang: s.overlay_game_lang(),
         overlay_autohide_sec: s.overlay_autohide_sec(),
+        overlay_text_scale: s.overlay_text_scale(),
+        overlay_anchor: s.overlay_anchor(),
+        overlay_sections: s.overlay_sections.clone().unwrap_or_else(|| {
+            ["flea", "flea_history", "traders", "traders_all", "slot", "quests", "barter", "barter_using", "hideout", "crafts", "caliber"]
+                .iter()
+                .map(|k| k.to_string())
+                .collect()
+        }),
+        overlay_corrections: s.overlay_corrections.clone(),
+        overlay_auto_enabled: s.overlay_auto_enabled,
+        overlay_auto_hotkey: s.overlay_auto_hotkey(),
+        overlay_hide_hotkey: s.overlay_hide_hotkey(),
         map: st.map.lock().unwrap().clone(),
         position: st.position.lock().unwrap().clone(),
         warnings: st.warnings.lock().unwrap().clone(),
@@ -514,15 +738,41 @@ fn apply_settings(app: AppHandle, state: State<AppState>, settings: Settings) ->
     *state.settings.lock().unwrap() = settings.clone();
     apply_always_on_top(&app, settings.always_on_top);
     apply_auto_start(settings.auto_start);
-    // (Re)enregistre les raccourcis avec les nouvelles valeurs.
-    if let Err(e) = apply_overlay_hotkeys(&app, &settings.overlay_capture_hotkey(), &settings.overlay_toggle_hotkey()) {
+    // Ancre de la carte : retenu par le module overlay (aucune invention de coin).
+    overlay::set_overlay_anchor(&settings.overlay_anchor());
+    // Le mode auto suit la case cochée (le fil reste actif s'il tournait déjà).
+    AUTO_ENABLED.store(settings.overlay_auto_enabled, AtomicOrdering::SeqCst);
+    // (Re)enregistre les raccourcis avec les nouvelles valeurs. Une erreur de
+    // raccourci est une vraie erreur utilisateur : remontée à l'interface.
+    let hk = apply_overlay_hotkeys(
+        &app,
+        &settings.overlay_capture_hotkey(),
+        &settings.overlay_toggle_hotkey(),
+        &settings.overlay_auto_hotkey(),
+        &settings.overlay_hide_hotkey(),
+    );
+    if let Err(e) = hk {
         eprintln!("[main] apply_settings: {e}");
+        let _ = app.emit("overlay_error", e.clone());
     }
+    // Pousse la nouvelle configuration d'affichage à la carte sans toucher au
+    // contenu courant.
+    store_overlay(serde_json::json!({
+        "status": "config",
+        "cfg": build_overlay_cfg(&settings),
+    }));
     start_watchers(&app);
     if normalize_mode(settings.game_mode.as_deref()) != prev_mode {
         let _ = app.emit("game_mode_changed", settings.game_mode.clone().unwrap_or_else(|| "PvP".into()));
     }
     Ok(snapshot(&state))
+}
+
+/// Bascule du mode « prix au survol » depuis un bouton des réglages.
+#[tauri::command]
+fn set_overlay_auto_cmd(app: AppHandle, on: bool) -> Result<(), String> {
+    set_overlay_auto(&app, on);
+    Ok(())
 }
 
 /// Bascule « toujours au premier plan » sans ouvrir les réglages (bouton de la barre du bas).
@@ -550,19 +800,52 @@ fn get_overlay_data() -> Option<serde_json::Value> {
     LAST_OVERLAY_RESULT.lock().unwrap().clone()
 }
 
-/// Test: stocke un résultat factice pour vérifier le frontend.
+/// Test: stocke un résultat factice pour vérifier le frontend. C'est AUSSI le
+/// mock canonique des champs que rend la carte : la forme de ce mock est le
+/// contrat du rendu (référence pour tests et débogage in-app).
 #[tauri::command]
 fn debug_overlay_test() {
     store_overlay(serde_json::json!({
         "status": "ok",
         "result": {
-            "item_name": "Test Item",
-            "flea_price": 50000,
-            "trader_price": 30000,
+            "item_name": "Test Item — Long Name Truncated At Thirty",
+            "short_name": "TestItem",
             "width": 2,
-            "used_in_tasks": [{"name": "Test Quest"}],
-            "barters_for": [{"trader": "Prapor", "level": 2, "items": [{"count": 1, "name": "Bandage"}]}],
-            "needed_for_hideout": [{"station": "Medstation", "level": 2, "count": 3}]
+            "height": 1,
+            "weight": 1.3,
+            "icon": "https://assets.tarkov.dev/test.webp",
+            "flea_price": 50000,
+            "flea_low_24h": 45000,
+            "flea_high_24h": 55000,
+            "flea_last_offer_count": 42,
+            "flea_change_48h_pct": -3.4,
+            "trader_price": 30000,
+            "sell_for": [
+                {"name": "Therapist", "price": 30000, "min_level": 2},
+                {"name": "Prapor", "price": 22000, "min_level": 1},
+                {"name": "Skier", "price": 18000, "min_level": 1}
+            ],
+            "used_in_tasks": [
+                {"id": "t1", "name": "Test Quest", "count": 3, "fir": true, "kappa_required": true, "task_status": null},
+                {"id": "t2", "name": "Another Quest", "count": 1, "fir": false, "kappa_required": false, "task_status": "completed"}
+            ],
+            "barters_for": [
+                {"trader": "Prapor", "level": 2, "items": [{"count": 1, "name": "Bandage"}, {"count": 2, "name": "Screw"}]}
+            ],
+            "barters_using": [
+                {"trader": "Skier", "level": 3, "rewards": [{"count": 1, "name": "AK-74N"}]}
+            ],
+            "buy_for": [{"name": "Therapist", "price": 15000, "min_level": 2}],
+            "needed_for_hideout": [
+                {"station": "Medstation", "level": 2, "count": 3, "fir": true},
+                {"station": "Intelligence Center", "level": 1, "count": 1, "fir": false}
+            ],
+            "crafts_for": [
+                {"station": "Medstation", "level": 2, "duration_sec": 7200, "items": [{"count": 1, "name": "Splint"}]}
+            ],
+            "caliber": "Caliber545x39",
+            "caliber_display": "5.45x39",
+            "raw_text": "test item"
         },
         "autohide": 0
     }));
@@ -726,6 +1009,10 @@ fn main() {
                         Some("capture")
                     } else if cfg.toggle.as_ref() == Some(shortcut) {
                         Some("toggle")
+                    } else if cfg.auto.as_ref() == Some(shortcut) {
+                        Some("auto")
+                    } else if cfg.hide.as_ref() == Some(shortcut) {
+                        Some("hide")
                     } else {
                         None
                     };
@@ -765,6 +1052,18 @@ fn main() {
                                 }
                                 _ => {}
                             }
+                        }
+                        "hide" => {
+                            // Masquage immédiat de la carte, peu importe l'état.
+                            drop(cfg);
+                            let _ = overlay::hide_overlay_window(app);
+                            store_overlay(serde_json::json!({ "status": "hide" }));
+                        }
+                        "auto" => {
+                            // Bascule du mode « prix au survol » (persistance incluse).
+                            let on = !AUTO_ENABLED.load(AtomicOrdering::SeqCst);
+                            drop(cfg);
+                            set_overlay_auto(app, on);
                         }
                         "capture" => {
                             drop(cfg); // unlock before async spawn
@@ -813,8 +1112,21 @@ fn main() {
             {
                 let st = handle.state::<AppState>();
                 let s = st.settings.lock().unwrap();
-                let _ = apply_overlay_hotkeys(&handle, &s.overlay_capture_hotkey(), &s.overlay_toggle_hotkey());
+                // Ancre choisie + mode auto tel que laissé dans les réglages.
+                overlay::set_overlay_anchor(&s.overlay_anchor());
+                AUTO_ENABLED.store(s.overlay_auto_enabled, AtomicOrdering::SeqCst);
+                let _ = apply_overlay_hotkeys(
+                    &handle,
+                    &s.overlay_capture_hotkey(),
+                    &s.overlay_toggle_hotkey(),
+                    &s.overlay_auto_hotkey(),
+                    &s.overlay_hide_hotkey(),
+                );
             }
+
+            // Fil du mode auto : 900 ms de sommeil quand le mode est coupé —
+            // zéro capture, zéro OCR, zéro requête tant qu'il ne se passe rien.
+            spawn_auto_loop(handle.clone());
 
         // Démarrage du sidecar en arrière-plan. Le sidecar est léger (port
             // 8765) et reste inactif tant qu'aucune capture ne provient du
@@ -897,6 +1209,7 @@ fn main() {
             is_tarkov_running_cmd,
             get_cursor_position,
             get_overlay_data,
+            set_overlay_auto_cmd,
             debug_overlay_test,
         ])
         .run(tauri::generate_context!())

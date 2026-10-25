@@ -1,5 +1,28 @@
 # Changelog / Journal des modifications
 
+## 0.9.15 — Overlay Blitz : carte enrichie, réglages complets, mode auto optionnel
+
+### FR
+- **Carte d'objet in-game enrichie** : l'overlay au curseur affiche désormais Flea + tendance 48h (↗/↘), fourchette 24h et nombre d'offres ; meilleur marchand de revente + prix des autres marchands ; prix /slot et /kg ; calibre (munitions) ; quêtes avec comptes ×N, marque FIR ⚑, requirement Kappa κ et l'état du joueur (terminée = barrée + ✓) ; où récupérer l'objet (barter) et où le dépenser ; planque (≤ 3 stations + « +N ») ; crafts (station, durée, ingrédients) ; texte brut lu par l'OCR (section debug).
+- **Sections activables une à une** : chaque bloc ci-dessus se masque/affiche individuellement dans les réglages (par défaut : tout est visible sauf « Acheter » et « Texte lu »).
+- **Opacité du fond (0.3–1) et taille du texte (0.7–2)** configurables ; l'échelle n'utilise pas de « zoom » CSS (les tailles dérivent d'une variable, la fenêtre suit le contenu).
+- **Position de la carte au choix** : coin haut-gauche (défaut, position historique validée conservée), haut-droit, bas-gauche, bas-droit — avec marge tenant compte de l'échelle et collage à l'écran du curseur.
+- **Mode « prix au survol » (optionnel, désactivé par défaut)** : une lecture par déplacement réel du curseur (≈ 28 px à 1080p), espacée d'au moins 1,5 s, uniquement quand Tarkov est au premier plan et qu'aucune lecture n'est en cours. Aucune boucle permanente : zéro OCR tant que rien ne bouge. Raccourci dédié pour l'activer en jeu et un raccourci « masquer » immédiat, autres désactivés par défaut.
+- **Corrections OCR mémorisées** : réglage libre « texte lu = nom officiel » (une par ligne) ; envoyé à chaque lecture au moteur OCR, une correction apprise s'applique à toutes les lectures suivantes ; lignes malformées signalées.
+- **Retours d'état clairs sur la carte** : Lecture…, mode auto activé/désactivé, « Lance Tarkov d'abord », erreurs réseaux explicites ; AUCUN prix fabriqué en cas d'échec de reconnaissance (le titre montre le texte brut pour aider à corriger).
+- **Fiabilité** : séquence anti-doublon conservée ; la fenêtre se recale à chaque redimensionnement ; l'échappement HTML entré manuellement est neutralisé.
+- **Chantier code** : suppression d'un `src/lib.rs` reliquat (compilation bin propre, 0 warning) ; géométrie de capture validée verrouillée par tests unitaires (125×40 à curseur +13/−53, miroir, box « ground », échelles 1440p/4K).
+
+### EN
+- **Richer in-game item card**: flea price + 48h trend, 24h range & offers, best resale trader + other traders, price per slot / kg, caliber, quests with counts/FIR/Kappa/player progress, how the item is obtained (barter) or spent, hideout stations, crafts, raw OCR text (debug section).
+- **Individually toggleable sections** in the settings (default: everything but “Buy” and “Raw text”).
+- **Background opacity (0.3–1) and text size (0.7–2)** configurable; text scale via CSS variables (no zoom).
+- **Card position**: top-left (default, validated position kept), top-right, bottom-left, bottom-right — anchored to the monitor under the cursor.
+- **Optional hover-pricing (auto) mode, off by default**: one read per real cursor move (≈28 px at 1080p), at least 1.5 s apart, only while Tarkov is the foreground window and no read is running. No permanent loop.
+- **Memorized OCR corrections**: free-form “read = official name” lines (one per line), sent on every lookup; malformed lines reported.
+- **Clear card states**: reading, auto on/off, “start Tarkov first”, network errors; none of them fabricates prices.
+- **Side note**: v0.9.13–0.9.14 semantics (fixed-location quest markers, “started” = actually started quests) now covered by the e2e test suite.
+
 ## 0.9.14 — Carte : gestion de la hauteur et des étages
 
 ### FR
