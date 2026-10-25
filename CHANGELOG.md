@@ -1,5 +1,17 @@
 # Changelog / Journal des modifications
 
+## 0.9.16 — Lecture d'objet : correctif après mise à jour + table corrections
+
+### FR
+- **Correctif « aucun objet est reconnu » après une mise à jour de l'app** : le moteur OCR (processus autonome) rejette toute capture dont le numéro d'ordre est inférieur au précédent et garde en mémoire ce numéro entre les sessions. Le compteur de l'app repartait de 1 à chaque redémarrage — après une mise à jour (ou même un simple redémarrage de l'app, la fenêtre d'OCR restant ouverte), toutes les lectures étaient rejetées et la carte affichait « Objet non reconnu » en permanence. Le compteur démarre désormais à l'heure système, toujours supérieur à celui de toute session précédente. (Diagnostic confirmé par sondes HTTP réelles sur :8765.)
+- **Table « corrections OCR » réparée** : les corrections saisies dans les réglages étaient envoyées au moteur comme une chaîne de texte au lieu d'un objet (rejet de la requête: 422) — toute lecture échouait tant qu'une correction existait. Envoyées désormais au format attendu.
+- Tests : nouveau test unitaire (monotonie inter-session du compteur), chaîne complète au vert.
+
+### EN
+- **Fix “no item is recognized” after updating the app**: the OCR engine keeps the highest request sequence number it ever saw and rejects older ones, surviving app restarts/updates. The app counter restarted from 1 every session, so every lookup was rejected and the card permanently showed “Item not recognized”. The counter now starts from the system clock, always higher than any previous session.
+- **OCR corrections table fixed**: user corrections were sent as a JSON string instead of an object (422 — every lookup with a correction failed). Now sent in the expected format.
+- Tests: new inter-session monotonicity unit test; full chain green.
+
 ## 0.9.15 — Overlay Blitz : carte enrichie, réglages complets, mode auto optionnel
 
 ### FR

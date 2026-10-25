@@ -461,6 +461,27 @@ impl CaptureRegion {
 
 static LOOKUP_SEQ: AtomicU64 = AtomicU64::new(0);
 
+/// Base client_seq de ce processus. Le sidecar garde en mémoire le plus grand
+/// client_seq qu'il a vu et rejette toute capture séquentielle inférieure (la
+/// nouvelle pression doit toujours gagner). Ce compteur vit dans le processus
+/// sidecar, qui survit aux redémarrages et mises à jour de l'app : si la base
+/// était 0 à chaque démarrage, TOUTES les captures de la session seraient
+/// rejetées (« superseded », carte « Objet non reconnu », réponse 200 vide).
+/// On survit en partant de l'heure epoch en ms — toujours supérieure à celle
+/// de toute session précédente, sans coordination avec le sidecar (lecture
+/// seule). Deux instances démarrées dans la même milliseconde sont
+/// théoriquement confondues, cas impossible manuellement et transitoire.
+pub fn next_client_seq() -> u64 {
+    static BASE: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    let base = *BASE.get_or_init(|| {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(1_000_000_000_000)
+    });
+    base + LOOKUP_SEQ.fetch_add(1, Ordering::SeqCst) + 1
+}
+
 /// Client HTTP partagé : en construire un à chaque capture coûtait une
 /// initialisation TLS à chaque F2 alors que le sidecar est en localhost.
 static LOOKUP_CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
@@ -485,11 +506,17 @@ fn lookup_client() -> Result<&'static reqwest::Client, String> {
 /// against the tarkov.dev catalog in that language. `game_mode` uses the
 /// sidecar's own vocabulary — "regular" or "pve". `corrections` is the
 /// user-maintained OCR fix table (raw read text → canonical item name); sent
-/// on every lookup so one learned fix applies to all future reads.
-pub async fn lookup_once(lang: &str, game_mode: &str, corrections: Option<String>) -> Result<serde_json::Value, String> {
+/// on every lookup so one learned fix applies to all future reads. It must be
+/// a JSON *object* (`dict[str, str]` for the sidecar) — sending it as a string
+/// makes pydantic reject the whole request with 422.
+pub async fn lookup_once(
+    lang: &str,
+    game_mode: &str,
+    corrections: Option<serde_json::Value>,
+) -> Result<serde_json::Value, String> {
     let (cx, cy) = get_cursor_position();
     let region = CaptureRegion::at(cx, cy);
-    let seq = LOOKUP_SEQ.fetch_add(1, Ordering::SeqCst) + 1;
+    let seq = next_client_seq();
 
     let body = serde_json::json!({
         "x": region.x,
@@ -507,18 +534,15 @@ pub async fn lookup_once(lang: &str, game_mode: &str, corrections: Option<String
         "ground_height": region.ground_height,
         "client_seq": seq,
     });
-    let body = match corrections {
-        // La table attendue par le sidecar est dict[str, str] ; on ne pousse
-        // que du JSON objet — jamais du JSON texte transformé en chaîne.
-        Some(c) if c.trim().is_empty() => body,
-        Some(c) => {
+    let body = match corrections.as_ref().and_then(|v| v.as_object()) {
+        Some(o) if !o.is_empty() => {
             let mut body = body;
             body.as_object_mut()
                 .unwrap()
-                .insert("corrections".to_string(), serde_json::Value::from(c));
+                .insert("corrections".to_string(), corrections.unwrap_or_default());
             body
         }
-        None => body,
+        _ => body,
     };
 
     println!(
@@ -835,6 +859,18 @@ pub fn get_cursor_position() -> (i32, i32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// La base client_seq vaut l'heure epoch : après un redémarrage de l'app
+    /// (le sidecar, process orphelin survivant aux mises à jour, garde le plus
+    /// grand client_seq vu et rejette les captures séquentielles inférieures à
+    /// lui), les captures de la nouvelle session doivent rester acceptées.
+    #[test]
+    fn client_seq_beats_any_previous_session() {
+        let a = next_client_seq();
+        let b = next_client_seq();
+        assert!(b > a, "croissant dans la session");
+        assert!(a > 999_999, "base epoch ms, pas un compteur de session : {a}");
+    }
 
     /// La géométrie de capture VALIDÉE par l'utilisateur à 1920px est conservée
     /// telle quelle : la boîte est le quart bas-gauche de l'ancien 250x80, donc

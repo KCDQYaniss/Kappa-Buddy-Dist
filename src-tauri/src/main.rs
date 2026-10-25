@@ -146,12 +146,13 @@ impl Settings {
     fn overlay_hide_hotkey(&self) -> String {
         self.overlay_hide_hotkey.clone().unwrap_or_default()
     }
-    /// Table `texteOCR → nom officiel` sérialisée pour le corps /lookup.
-    fn overlay_corrections_body(&self) -> Option<String> {
+    /// Table `texteOCR → nom officiel` pour le corps /lookup : un objet JSON
+    /// (`dict[str, str]` côté sidecar), jamais une chaîne sérialisée.
+    fn overlay_corrections_body(&self) -> Option<serde_json::Value> {
         if self.overlay_corrections.is_empty() {
             None
         } else {
-            Some(serde_json::to_string(&self.overlay_corrections).unwrap_or_default())
+            Some(serde_json::to_value(&self.overlay_corrections).unwrap_or_default())
         }
     }
     /// Sections visibles de la carte, projeté en objet {clé: visible}.
