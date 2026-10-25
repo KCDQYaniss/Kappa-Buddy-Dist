@@ -283,7 +283,7 @@
       icon: L.divIcon({ className: "mpin", html, iconSize: [s, s], iconAnchor: [s / 2, s / 2] }),
       interactive: true, keyboard: false,
     }, extra || {}));
-    if (floorY != null) m._floorY = floorY;
+    if (floorY != null) { m._floorY = floorY; m._floorIdx = floorIdxOf(floorY); }
     return m;
   }
   function tip(layer, html) {
@@ -343,7 +343,7 @@
         if (e.outline && e.outline.length > 2) L.polygon(e.outline.map(ll), { color: c, weight: 1, fillOpacity: 0.12, interactive: false }).addTo(g);
         const d = pin(ll(e.position), "extract", c, 18, {}, e.position.y).addTo(g);
         d.bindTooltip(esc(e.name || t("map.layer.extracts")), { permanent: true, direction: "right", offset: [8, 0], className: "tt-label" });
-        d.bindPopup(extractPopup(e, FAC));
+        d.bindPopup(extractPopup(e, FAC) + floorTip(e.position.y));
       }
       return g;
     },
@@ -351,7 +351,7 @@
       const g = L.layerGroup();
       for (const t_ of md.transits) {
         const d = pin(ll(t_.position), "transit", COL.transit, 16, {}, t_.position.y).addTo(g);
-        tip(d, `<b>${esc(t("map.layer.transits"))}</b><br>${esc(t_.description || "")}`);
+        tip(d, `<b>${esc(t("map.layer.transits"))}</b><br>${esc(t_.description || "")}` + floorTip(t_.position.y));
       }
       return g;
     },
@@ -363,7 +363,7 @@
         const c = l.needsPower ? COL.lockPower : (l.lockType === "trunk" ? COL.container : COL.lock);
         const d = pin(ll(l.position), "lock", c, 15, {}, l.position.y).addTo(g);
         const type = l.lockType === "trunk" ? t("map.lock.trunk") : t("map.lock.door");
-        tip(d, `<b>${esc(t("map.lock.title"))} — ${esc(type)}</b>` + (l.key && l.key.name ? `<br>${esc(l.key.name)}` : "") + (l.needsPower ? " ⚡" : ""));
+        tip(d, `<b>${esc(t("map.lock.title"))} — ${esc(type)}</b>` + (l.key && l.key.name ? `<br>${esc(l.key.name)}` : "") + (l.needsPower ? " ⚡" : "") + floorTip(l.position.y));
         d.bindPopup(() => lockPopup(l));
         d.on("popupopen", (ev) => {
           const el = ev.popup.getElement();
@@ -384,18 +384,23 @@
         if ((!sides.pmc || offSides.has("pmc")) && (!sides.scav || offSides.has("scav"))) continue;
         const sc = sides.scav && !sides.pmc;
         const d = pin(ll(s_.position), sc ? "spawnScav" : "spawnPmc", sc ? COL.spawnScav : COL.spawnPmc, 15, {}, s_.position.y).addTo(g);
-        tip(d, `<b>${esc(t("map.layer.spawns"))} ${sc ? "Scav" : "PMC"}</b><br>${esc((s_.categories || []).join(", "))}`);
+        tip(d, `<b>${esc(t("map.layer.spawns"))} ${sc ? "Scav" : "PMC"}</b><br>${esc((s_.categories || []).join(", "))}` + floorTip(s_.position.y));
       }
       return g;
     },
     loose(md) {
       const g = L.layerGroup();
-      for (const l of md.loose) tip(dot(ll(l.position), COL.loose, 2.5, { weight: 0.5 }).addTo(g), itemList(l.items) || t("map.layer.loose"));
+      for (const l of md.loose) {
+        const d = dot(ll(l.position), COL.loose, 2.5, { weight: 0.5 }).addTo(g);
+        d._floorY = l.position.y;   // atténuation par étage comme les autres points
+        d._floorIdx = floorIdxOf(l.position.y);
+        tip(d, (itemList(l.items) || t("map.layer.loose")) + floorTip(l.position.y));
+      }
       return g;
     },
     stationary(md) {
       const g = L.layerGroup();
-      for (const w of md.stationary) tip(pin(ll(w.position), "stationary", COL.stationary, 16, {}, w.position.y).addTo(g), esc((w.stationaryWeapon && w.stationaryWeapon.name) || t("map.layer.stationary")));
+      for (const w of md.stationary) tip(pin(ll(w.position), "stationary", COL.stationary, 16, {}, w.position.y).addTo(g), esc((w.stationaryWeapon && w.stationaryWeapon.name) || t("map.layer.stationary")) + floorTip(w.position.y));
       return g;
     },
     /** Points utilisateur (icônes personnalisables avec popup). */
@@ -481,7 +486,7 @@
         try {
           setGroup("c:" + id, !!layerOn.containers && !offTypes.has(id), () => {
             const g = L.layerGroup();
-            for (const c of type.list) tip(pin(ll(c.position), "container", COL.container, 14, {}, c.position.y).addTo(g), esc(type.name));
+            for (const c of type.list) tip(pin(ll(c.position), "container", COL.container, 14, {}, c.position.y).addTo(g), esc(type.name) + floorTip(c.position.y));
             return g;
           });
         } catch (err) { console.error("conteneurs " + id + " :", err); }
@@ -491,6 +496,7 @@
     // toujours, même si les données ne sont pas encore téléchargées.
     try { setGroup("customPoints", !!layerOn.customPoints, () => builders.customPoints(md)); }
     catch (err) { console.error("points personnalisés :", err); }
+    updateFloorOpacity();   // les calques reconstruits reprennent l'atténuation de l'étage courant
     drawQuests();
     drawHighlight();
     // Les points de surbrillance et de quêtes passent au-dessus.
@@ -498,8 +504,45 @@
     // Right-click handler is set up in showMap() via lf.on("contextmenu")
   }
 
+  /* ---------- Modèle d'étages ----------
+   * Position horizontale (x, z) et hauteur (y) sont deux informations distinctes :
+   * un marqueur est rattaché à l'ÉTAGE dont il tient l'intervalle (nomenclature
+   * réelle de la carte), jamais « parce qu'il est dans un bâtiment ». Sans
+   * hauteur connue, l'étage reste explicitement inconnu (marqueur neutre). */
+  /** Index d'étage d'un point de hauteur `y` connue : celui qui le contient, en
+   *  préférant l'étage au sol le plus haut (résiste aux intervalles superposés —
+   *  même heuristique que pickFloor). null si la carte est plate ou y inconnu. */
+  function floorIdxOf(y) {
+    if (!cur || y == null || !isFinite(y)) return null;
+    return ((cur.def.floors || []).length < 2) ? null : pickFloor(y);
+  }
+  /** Nom lisible de l'étage, tel que défini par la carte elle-même. */
+  function floorName(i) {
+    const f = cur && cur.def.floors && cur.def.floors[i];
+    return (f && f.name) || "";
+  }
+  /** Suffixe d'infobulle : à quel étage se trouve ce marqueur (cartes multi-étages). */
+  function floorTip(fy) {
+    if (fy == null) return "";
+    const i = floorIdxOf(fy);
+    if (i == null) return "";
+    const name = floorName(i);
+    return name ? `<div class="dim">📍 ${esc(name)}</div>` : "";
+  }
+  /** Bascule sur l'étage qui contient la hauteur `y` (selon la carte). Désactive le
+   *  mode auto comme un clic manuel sur la barre d'étages. Renvoie vrai si fait. */
+  function gotoFloor(y) {
+    if (!cur || !cur.def.floors || cur.def.floors.length < 2) return false;
+    const i = floorIdxOf(y);
+    if (i == null || i === cur.floorIndex) return false;
+    cur.floorAuto = false;
+    setFloorLayer(i);
+    return true;
+  }
+
   /* ---------- Transparence par étage ---------- */
-  /** Les marqueurs dont la hauteur y sort du ylim de l'étage courant sont assomnis. */
+  /** Les marqueurs connus d'un autre étage sont assomnis ; sans hauteur connue,
+   *  le marqueur reste opaque sur tous les étages (donnée inconnue ≠ invention). */
   function updateFloorOpacity() {
     if (!cur || !cur.def.floors || cur.def.floors.length < 2) return;
     const fl = cur.def.floors[cur.floorIndex];
@@ -508,7 +551,12 @@
     Object.values(cur.groups).forEach((g) => {
       if (!g || !g.eachLayer) return;
       g.eachLayer((layer) => {
-        if (layer._floorY != null) { layer.setOpacity(inRange(layer._floorY) ? 1 : 0.35); }
+        if (layer._floorIdx != null) {
+          const on = layer._floorIdx === cur.floorIndex;
+          if (layer.setOpacity) layer.setOpacity(on ? 1 : 0.35);
+        } else if (layer._floorY != null) {
+          if (layer.setOpacity) layer.setOpacity(inRange(layer._floorY) ? 1 : 0.35);
+        }
       });
     });
   }
@@ -583,64 +631,73 @@
     //    zones (site imposé), possibleLocations (objet de quête à un endroit
     //    précis), extraits (sortie nommée). Aucun spawn générique.
     const centroid = (arr) => { let x = 0, y = 0, z = 0; for (const p of arr) { x += p.x; y += p.y; z += p.z; } const n = arr.length; return { x: x / n, y: y / n, z: z / n }; };
+    const addPt = (e, w) => { if (e.floorY == null) e.floorY = w.y; pts.push({ w, e }); };
     const pts = [];
     for (const e of shown) {
       const html = `<b>${esc(e.task.name)}</b><br>${esc(e.obj.description)}`;
-      e._pts = [];
+      e._pts = []; e.floorY = null;
       for (const z of e.zonesHere) {
         if (z.outline && z.outline.length > 2) {
           const poly = L.polygon(z.outline.map(ll), { color: COL.quest, weight: 2, fillOpacity: 0.18 }).addTo(g);
           tip(poly, html);
-          pts.push({ w: centroid(z.outline), e }); e._pts.push(...z.outline.map(ll));
+          addPt(e, centroid(z.outline)); e._pts.push(...z.outline.map(ll));
         } else if (z.position) {
-          pts.push({ w: z.position, e }); e._pts.push(ll(z.position));
+          addPt(e, z.position); e._pts.push(ll(z.position));
         }
       }
-      for (const l of e.locsHere) for (const p of (l.positions || [])) { pts.push({ w: p, e }); e._pts.push(ll(p)); }
+      for (const l of e.locsHere) for (const p of (l.positions || [])) { addPt(e, p); e._pts.push(ll(p)); }
       if (md && e.obj.type === "extract" && e.obj.exitName) {
         const x = md.extracts.find((m) => (m.name || "").toLowerCase() === e.obj.exitName.toLowerCase());
-        if (x) { pts.push({ w: x.position, e }); e._pts.push(ll(x.position)); }
+        if (x) { addPt(e, x.position); e._pts.push(ll(x.position)); }
       }
     }
 
-    // 2) Regrouper les points superposés ou proches (même pièce, même porte) :
-    //    un seul marqueur par groupe, infobulle listant chaque objectif distinct.
+    // 2) Regrouper les points proches ET du même étage. Position horizontale (x, z)
+    //    et hauteur (y) sont deux données distinctes : deux marqueurs aux mêmes
+    //    coordonnées planaires mais d'étages différents ne fusionnent jamais.
+    //    Sans hauteur connue, le regroupement planaire ne touche que d'autres
+    //    points « étage inconnu » (aucune invention, spec §2/§6/§8).
     const CLUSTER_R = 8; // unités monde ≈ une salle
     const clusters = [];
     for (const p of pts) {
+      p.floorIdx = floorIdxOf(p.w.y);
       let best = null, bd = Infinity;
       for (const c of clusters) {
+        if (c.floorIdx !== p.floorIdx) continue;
         const d = Math.hypot(p.w.x - c.x, p.w.z - c.z);
         if (d <= CLUSTER_R && d < bd) { bd = d; best = c; }
       }
-      if (best) best.items.push(p); else clusters.push({ x: p.w.x, z: p.w.z, w: p.w, items: [p] });
+      if (best) best.items.push(p);
+      else clusters.push({ x: p.w.x, z: p.w.z, w: p.w, floorIdx: p.floorIdx, items: [p] });
     }
 
-    // 3) Dessin. La clé éventuellement requise est résumée d'après le verrou
-    //    le plus proche (même pièce) — conditions nécessaires, spec §2.
+    // 3) Dessin. Étage affiché sous l'objectif (nomenclature réelle de la carte),
+    //    clé requise cherchée dans les verrous du MÊME étage uniquement (une porte
+    //    juste au-dessus n'ouvre pas ce niveau), hauteur transmise au marqueur
+    //    pour l'atténuation d'étage.
     const KEY_R = 14;
+    const multi = cur.def.floors && cur.def.floors.length >= 2;
     for (const c of clusters) {
-      const parts = [], seen = new Set(), ys = [];
+      const parts = [], seen = new Set();
       let task0 = null;
       for (const it of c.items) {
         if (seen.has(it.e.obj.id)) continue;
         seen.add(it.e.obj.id);
         if (!task0) task0 = it.e.task;
-        ys.push(it.w.y || 0);
         parts.push(`<b>${esc(it.e.task.name)}</b><br>${esc(it.e.obj.description)}`);
       }
       const nObj = seen.size;
-      if (md && md.locks) {
+      if (multi && c.floorIdx != null && floorName(c.floorIdx)) parts.push(`<div class="dim">📍 ${esc(floorName(c.floorIdx))}</div>`);
+      if (md && md.locks && c.floorIdx != null) {
         let bd = Infinity, keyName = null, power = false;
         for (const l of md.locks) {
+          if (floorIdxOf(l.position.y) !== c.floorIdx) continue;
           const d = Math.hypot(l.position.x - c.x, l.position.z - c.z);
           if (d < KEY_R && d < bd) { bd = d; keyName = (l.key && l.key.name) || null; power = !!l.needsPower; }
         }
         if (keyName) parts.push(`<div class="dim">🔑 ${esc(t("map.lock.key"))} : ${esc(keyName)}${power ? " ⚡" : ""}</div>`);
       }
-      // Un étage homogène sert de repère de hauteur ; mélangé, le marqueur reste opaque partout.
-      const sameFloor = ys.every((v) => Math.abs(v - ys[0]) < 4);
-      const d = pin(ll(c.w), "quest", COL.quest, nObj > 1 ? 22 : 18, {}, sameFloor ? ys[0] : undefined).addTo(g);
+      const d = pin(ll(c.w), "quest", COL.quest, nObj > 1 ? 22 : 18, {}, c.floorIdx != null ? c.w.y : undefined).addTo(g);
       tip(d, parts.join("<hr>"));
       // Cliquer un marqueur ouvre le détail de la quête associée (spec §5).
       d.on("click", () => { if (TT.quests) { TT.nav.show("quests"); TT.quests.select(task0.id); } });
@@ -831,12 +888,16 @@
     else if (b.dataset.qzoom) zoomQuest(b.dataset.qzoom);
     else if (b.dataset.qe != null) {
       const en = cur.questEntries[+b.dataset.qe];
-      if (en && en.bounds) cur.lf.fitBounds(en.bounds.pad(0.6), { maxZoom: cur.def.maxZoom - 1 });
+      if (!en) return;
+      gotoFloor(en.floorY);   // objectif à un autre étage : on y bascule tout de suite
+      if (en.bounds) cur.lf.fitBounds(en.bounds.pad(0.6), { maxZoom: cur.def.maxZoom - 1 });
     } else if (b.dataset.sugg) highlightItem(b.dataset.sugg);
   }
   /** Zoome sur l'ensemble des objectifs d'une quête (la réaffiche d'abord si elle était masquée). */
   function zoomQuest(tid) {
     if (hiddenQuests.has(tid)) { hiddenQuests.delete(tid); save("hiddenQuests", [...hiddenQuests]); syncLayers(); renderSidebar(); }
+    const e0 = cur.questEntries.find((e) => e.task.id === tid);
+    if (e0) gotoFloor(e0.floorY);   // cadrer le bon étage, pas seulement le lieu
     const bs = cur.questEntries.filter((e) => e.task.id === tid && e.bounds).map((e) => e.bounds);
     if (!bs.length) return;
     const u = bs.reduce((a, c) => a.extend(c), L.latLngBounds(bs[0].getSouthWest(), bs[0].getNorthEast()));
@@ -904,6 +965,8 @@
     focusTask = id;
     hiddenQuests.delete(id); save("hiddenQuests", [...hiddenQuests]);
     syncLayers(); renderSidebar();
+    const e0 = cur.questEntries.find((e) => e.floorY != null);
+    if (e0) gotoFloor(e0.floorY);   // premier objectif avec hauteur connue : le bon étage
     const b = cur.questEntries.map((e) => e.bounds).filter(Boolean);
     if (b.length) cur.lf.fitBounds(b.reduce((a, c) => a.extend(c), L.latLngBounds(b[0].getSouthWest(), b[0].getNorthEast())).pad(0.5), { maxZoom: cur.def.maxZoom - 1 });
     return true;

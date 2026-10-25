@@ -1,5 +1,25 @@
 # Changelog / Journal des modifications
 
+## 0.9.14 — Carte : gestion de la hauteur et des étages
+
+### FR
+- **Position horizontale ≠ hauteur** : le regroupement de marqueurs ne fusionne que des points du même étage ; deux objectifs aux mêmes coordonnées planaires mais de niveaux différents restent des marqueurs distincts (porte du RDC ≠ porte du 1er).
+- **Étage de chaque marqueur identifié** : les infobulles portent la nomenclature réelle de la carte (« Ground Floor », « 3rd Floor », « Tunnels », « Bunkers », « Accommodation (lower) »…). Portes, conteneurs, spawns, extractions, armes fixes, loot au sol et objectifs de quête affichent leur niveau.
+- **Hauteur sans invention** : un point sans hauteur connue reste explicitement « étage inconnu » — jamais attribué arbitrairement au rez-de-chaussée.
+- **Atténuation précise par étage** : les marqueurs d'autres étages s'assombrissent selon l'étage réel du point (résiste aux limites d'étages superposées de certaines cartes) ; les calques reconstruits après un changement de filtre reprennent l'atténuation (correctif).
+- **Navigation verticale** : cliquer un objectif ou le bouton « Zoomer sur les objectifs » du panneau latéral bascule directement sur l'étage de l'objectif avant de le cadrer ; « Afficher sur la carte » fait de même. Le mode auto est désactivé comme pour un clic manuel sur la barre d'étages ; la position, les filtres et la quête sélectionnée sont conservés.
+- **Clé requise fiable** : la clé suggérée pour un objectif de quête ne peut venir que d'un verrou du même étage.
+- **Connexions verticales (escaliers, échelles, ascenseurs)** : aucun jeu de données n'expose ces liaisons de façon fiable — rien n'est affiché, conformément au principe « ne rien inventer ».
+
+### EN
+- **Horizontal position ≠ height**: marker grouping only merges points on the same floor; objectives sharing planar coordinates but on different levels remain distinct markers.
+- **Every marker labelled with its floor**, using the map's own names. Locks, containers, spawns, extracts, stationary weapons, ground loot and quest objectives show their level.
+- **No invented data**: a point with unknown height stays explicitly unknown — never assumed ground floor.
+- **Accurate per-floor dimming** based on the marker's real floor (resistant to overlapping floor ranges); layers rebuilt after a filter change re-apply the dimming (fix).
+- **Vertical navigation**: clicking an objective or its "zoom" button in the side panel switches to the objective's floor first, then frames it; "show on map" behaves the same. Auto mode is turned off exactly like a manual floor-bar click; map position, filters and selected quest are preserved.
+- **Reliable required key**: a quest objective's suggested key can only come from a lock on the same floor.
+- **Vertical connections (stairs, ladders, lifts)**: no dataset reliably exposes them — nothing is displayed, per the "never invent" principle.
+
 ## 0.9.13 — Quêtes ↔ carte : lieux fixes uniquement, marqueurs regroupés
 
 ### FR
