@@ -396,6 +396,39 @@ pub fn primary_monitor_width() -> i32 {
     1920
 }
 
+/// Bounds (left, top, width, height) of the monitor that carries the cursor,
+/// in physical pixels. The capture conditions (mirror near the right edge,
+/// ground near the centre) are evaluated on the gaming monitor — which is not
+/// necessarily the primary one on multi-monitor setups.
+#[cfg(windows)]
+pub fn cursor_monitor_bounds() -> (i32, i32, i32, i32) {
+    use windows_sys::Win32::Foundation::POINT;
+    use windows_sys::Win32::Graphics::Gdi::{
+        GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTONEAREST,
+    };
+    let (cx, cy) = get_cursor_position();
+    let pt = POINT { x: cx, y: cy };
+    unsafe {
+        let mon = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+        if mon.is_null() {
+            return (0, 0, primary_monitor_width(), 1080);
+        }
+        let mut info: MONITORINFO = std::mem::zeroed();
+        info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
+        if GetMonitorInfoW(mon, &mut info) != 0 {
+            let rc = info.rcMonitor;
+            (rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top)
+        } else {
+            (0, 0, primary_monitor_width(), 1080)
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub fn cursor_monitor_bounds() -> (i32, i32, i32, i32) {
+    (0, 0, primary_monitor_width(), 1080)
+}
+
 /// Geometry of the capture box, ported from pado8's `DEFAULT_REGION` so we read
 /// the same pixels the upstream overlay reads. Offsets are relative to the
 /// cursor; the scale follows the primary monitor width (1.0 at 1920, 1.33 at
@@ -406,11 +439,23 @@ pub struct CaptureRegion {
     pub y: i32,
     pub width: i32,
     pub height: i32,
-    pub ground_x: i32,
-    pub ground_y: i32,
-    pub ground_width: i32,
-    pub ground_height: i32,
-    pub mirror_x: i32,
+    /// Mirrored box (same size, left of the cursor), sent ONLY when the
+    /// primary box would overflow the cursor monitor's right edge — the case
+    /// where EFT flips the tooltip to the LEFT of the cursor. Sent mid-screen
+    /// it only ever reads neighbour captions and surfaces wrong items.
+    pub mirror_x: Option<i32>,
+    /// Ground-item label box (small strip under the crosshair). Deterministic
+    /// geometry; whether it is SENT is decided at capture time by the raid
+    /// gate (cursor hidden) — see `is_cursor_hidden`.
+    pub ground: GroundBox,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GroundBox {
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
 }
 
 impl CaptureRegion {
@@ -429,11 +474,23 @@ impl CaptureRegion {
     const GROUND_HEIGHT: f64 = 30.0;
 
     /// Pure builder for the capture boxes at a given resolution scale — the
-    /// unit-testable core. `at` plugs the live monitor width into it.
-    pub fn scaled(scale: f64, cursor_x: i32, cursor_y: i32) -> Self {
+    /// unit-testable core. `at` plugs the live cursor monitor into it.
+    /// `monitor` is the cursor monitor as (left, top, width, height) physical
+    /// pixels; the mirror condition is evaluated against its right edge.
+    pub fn scaled(scale: f64, cursor_x: i32, cursor_y: i32, monitor: (i32, i32, i32, i32)) -> Self {
         let r = |v: f64| (v * scale).round() as i32;
         let offset_x = r(Self::OFFSET_X);
         let width = r(Self::WIDTH);
+        let (mon_left, _mon_top, mon_w, _) = monitor;
+        // The tooltip flips to the left of the cursor only when there is no
+        // room right of it; that is the only case worth reading the mirrored
+        // box (a margin beyond the primary's right edge).
+        let primary_right = cursor_x + offset_x + width;
+        let mirror_x = if primary_right >= mon_left + mon_w - 48 {
+            Some(cursor_x - offset_x - width)
+        } else {
+            None
+        };
         CaptureRegion {
             // EFT opens the item tooltip slightly above and to the right of the
             // cursor — that is the box worth reading first.
@@ -441,22 +498,51 @@ impl CaptureRegion {
             y: cursor_y + r(Self::OFFSET_Y),
             width,
             height: r(Self::HEIGHT),
-            // The tooltip can also open on the left of the cursor; the sidecar
-            // falls back to this mirrored box when the primary read is junk.
-            mirror_x: cursor_x - offset_x - width,
+            mirror_x,
             // Dropped items in a raid draw a small label below the crosshair.
-            ground_x: cursor_x + r(Self::GROUND_OFFSET_X),
-            ground_y: cursor_y + r(Self::GROUND_OFFSET_Y),
-            ground_width: r(Self::GROUND_WIDTH),
-            ground_height: r(Self::GROUND_HEIGHT),
+            ground: GroundBox {
+                x: cursor_x + r(Self::GROUND_OFFSET_X),
+                y: cursor_y + r(Self::GROUND_OFFSET_Y),
+                width: r(Self::GROUND_WIDTH),
+                height: r(Self::GROUND_HEIGHT),
+            },
         }
     }
 
-    /// Build the capture boxes for a cursor position.
+    /// Build the capture boxes for a cursor position on its actual monitor.
     pub fn at(cursor_x: i32, cursor_y: i32) -> Self {
         let scale = (primary_monitor_width() as f64 / 1920.0).max(1.0);
-        Self::scaled(scale, cursor_x, cursor_y)
+        Self::scaled(scale, cursor_x, cursor_y, cursor_monitor_bounds())
     }
+}
+
+/// Is the OS cursor currently hidden? EFT's raw-input raid loop hides it
+/// (ShowCursor(FALSE)), while stash/flea/trader menus show a normal pointer.
+/// The ground box (used for floor-item labels) is therefore worth trying only
+/// when the pointer is gone: in menus that box is just a strip of neighbour
+/// captions around the tooltip, which surfaces wrong items. Called only when
+/// Tarkov is the foreground window, so idle-hide quirks of other apps don't
+/// matter here. Probe failure returns false (skip the box) — a lost raid
+/// ground read is cheaper than a wrong menu read.
+#[cfg(windows)]
+pub fn is_cursor_hidden() -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GetCursorInfo, CURSORINFO, CURSOR_SHOWING,
+    };
+    unsafe {
+        let mut ci: CURSORINFO = std::mem::zeroed();
+        ci.cbSize = std::mem::size_of::<CURSORINFO>() as u32;
+        if GetCursorInfo(&mut ci) != 0 {
+            ci.flags & CURSOR_SHOWING == 0
+        } else {
+            false
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub fn is_cursor_hidden() -> bool {
+    false
 }
 
 static LOOKUP_SEQ: AtomicU64 = AtomicU64::new(0);
@@ -525,18 +611,30 @@ pub async fn lookup_once(
         "height": region.height,
         "lang": lang,
         "game_mode": game_mode,
-        "mirror_x": region.mirror_x,
         "cursor_x": cx,
         "cursor_y": cy,
-        "ground_x": region.ground_x,
-        "ground_y": region.ground_y,
-        "ground_width": region.ground_width,
-        "ground_height": region.ground_height,
         "client_seq": seq,
     });
+    let mut body = body;
+    if let Some(mirror) = region.mirror_x {
+        body.as_object_mut()
+            .unwrap()
+            .insert("mirror_x".to_string(), serde_json::json!(mirror));
+    }
+    let ground_sent = is_cursor_hidden();
+    if let Some(ground) = ground_sent.then(|| region.ground) {
+        let o = body.as_object_mut().unwrap();
+        for (k, v) in [
+            ("ground_x", ground.x),
+            ("ground_y", ground.y),
+            ("ground_width", ground.width),
+            ("ground_height", ground.height),
+        ] {
+            o.insert(k.to_string(), serde_json::json!(v));
+        }
+    }
     let body = match corrections.as_ref().and_then(|v| v.as_object()) {
         Some(o) if !o.is_empty() => {
-            let mut body = body;
             body.as_object_mut()
                 .unwrap()
                 .insert("corrections".to_string(), corrections.unwrap_or_default());
@@ -546,9 +644,10 @@ pub async fn lookup_once(
     };
 
     println!(
-        "[overlay] lookup #{seq} cursor=({cx},{cy}) box=({},{},{},{}) ground=({},{},{},{}) lang={lang} mode={game_mode}",
+        "[overlay] lookup #{seq} cursor=({cx},{cy}) box=({},{},{},{}) mirror={} ground={} lang={lang} mode={game_mode}",
         region.x, region.y, region.width, region.height,
-        region.ground_x, region.ground_y, region.ground_width, region.ground_height
+        region.mirror_x.map(|x| x.to_string()).unwrap_or_else(|| "off".into()),
+        if ground_sent { format!("{}x{}+{}+{}", region.ground.width, region.ground.height, region.ground.x, region.ground.y) } else { "off".to_string() }
     );
 
     let client = lookup_client()?;
@@ -874,19 +973,21 @@ mod tests {
 
     /// La géométrie de capture VALIDÉE par l'utilisateur à 1920px est conservée
     /// telle quelle : la boîte est le quart bas-gauche de l'ancien 250x80, donc
-    /// origine (curseur +13, curseur −53) et taille 125x40.
+    /// origine (curseur +13, curseur −53) et taille 125x40 ; la boîte ground
+    /// (curseur −80/+30, 160×30) garde ses mesures d'origine — son ENVOI est
+    /// conditionné ailleurs (curseur masqué = raid).
     #[test]
     fn capture_region_at_1920_matches_validated_geometry() {
-        let r = CaptureRegion::scaled(1.0, 1000, 500);
+        let r = CaptureRegion::scaled(1.0, 1000, 500, (0, 0, 1920, 1080));
         assert_eq!(r.x, 1013);
         assert_eq!(r.y, 447);
         assert_eq!(r.width, 125);
         assert_eq!(r.height, 40);
-        assert_eq!(r.mirror_x, 1000 - 13 - 125);
-        assert_eq!(r.ground_x, 920);
-        assert_eq!(r.ground_y, 530);
-        assert_eq!(r.ground_width, 160);
-        assert_eq!(r.ground_height, 30);
+        assert_eq!(r.mirror_x, None, "milieu d'écran : pas de miroir");
+        assert_eq!(r.ground.x, 920);
+        assert_eq!(r.ground.y, 530);
+        assert_eq!(r.ground.width, 160);
+        assert_eq!(r.ground.height, 30);
     }
 
     /// EFT met le tooltip à l'échelle de l'écran : 1440p → ×1.333, 4K → ×2.0.
@@ -894,29 +995,58 @@ mod tests {
     /// historique (~curseur +13, ~curseur −13) suit l'arrondi indépendant.
     #[test]
     fn capture_region_scales_with_resolution() {
-        // 1440p (×1.333…) : OFFSET_X 17, size 167x53, miroir à gauche.
-        let hd = CaptureRegion::scaled(2560.0 / 1920.0, 1000, 500);
+        // 1440p (×1.333…) : OFFSET_X 17, size 167x53 ; curseur loin du bord
+        // droit → pas de miroir.
+        let hd = CaptureRegion::scaled(2560.0 / 1920.0, 1000, 500, (0, 0, 2560, 1440));
         assert_eq!(hd.x, 1017);              // 1000 + round(13×1.3333)
         assert_eq!(hd.y, 429);               // 500 − round(53×1.3333)
         assert_eq!(hd.width, 167);
         assert_eq!(hd.height, 53);
-        assert_eq!(hd.mirror_x, 1000 - 17 - 167);
-        assert_eq!(hd.ground_x, 893);        // 1000 + round(−80×1.3333)
-        assert_eq!(hd.ground_y, 540);        // 500 + round(30×1.3333)
-        assert_eq!(hd.ground_width, 213);
-        assert_eq!(hd.ground_height, 40);
+        assert_eq!(hd.mirror_x, None);
 
         // 4K (×2.0) : taille exactement double de la géométrie validée.
-        let r = CaptureRegion::scaled(3840.0 / 1920.0, 1000, 500);
+        let r = CaptureRegion::scaled(3840.0 / 1920.0, 1000, 500, (0, 0, 3840, 2160));
         assert_eq!(r.x, 1026);               // 1000 + 26
         assert_eq!(r.y, 394);                // 500 − 106
         assert_eq!(r.width, 250);
         assert_eq!(r.height, 80);
-        assert_eq!(r.mirror_x, 1000 - 26 - 250);
-        assert_eq!(r.ground_x, 840);
-        assert_eq!(r.ground_y, 560);
-        assert_eq!(r.ground_width, 320);
-        assert_eq!(r.ground_height, 60);
+        assert_eq!(r.mirror_x, None);
+        assert_eq!(r.ground.x, 840);         // 1000 − 160
+        assert_eq!(r.ground.y, 560);         // 500 + 60
+        assert_eq!(r.ground.width, 320);
+        assert_eq!(r.ground.height, 60);
+    }
+
+    /// Le miroir (boîte à GAUCHE du curseur) n'est envoyé que quand la boîte
+    /// principale déborderait du bord droit de l'écran — le seul cas où EFT
+    /// inverse le tooltip vers la gauche. Milieu d'écran il ne fait que lire
+    /// des légendes de voisins et remonter de faux objets.
+    #[test]
+    fn mirror_only_next_to_the_right_edge() {
+        // 2560×1440 ; seuil : curseur + 184 ≥ 2560 − 48 → curseur ≥ 2328.
+        assert_eq!(
+            CaptureRegion::scaled(2560.0 / 1920.0, 1200, 700, (0, 0, 2560, 1440)).mirror_x,
+            None
+        );
+        assert_eq!(
+            CaptureRegion::scaled(2560.0 / 1920.0, 2300, 700, (0, 0, 2560, 1440)).mirror_x,
+            None
+        );
+        let edge = CaptureRegion::scaled(2560.0 / 1920.0, 2400, 700, (0, 0, 2560, 1440));
+        assert_eq!(edge.mirror_x, Some(2400 - 17 - 167));
+        // Écran à origine négative (moniteur à gauche) : la condition est
+        // relative aux bornes réelles de l'écran du curseur — le moniteur
+        // (-1920..0) finit à x=0 : −100 est donc PRÈS du bord droit.
+        let left_mon = (-1920, 156, 1920, 1080);
+        assert_eq!(
+            CaptureRegion::scaled(1.0, -400, 700, left_mon).mirror_x,
+            None,
+            "−400 : la boîte principale finit à −262, loin du bord (−48)"
+        );
+        assert_eq!(
+            CaptureRegion::scaled(1.0, -100, 700, left_mon).mirror_x,
+            Some(-238)
+        );
     }
 
     /// « TL » reste la position historique exacte, quel que soit le DPI.

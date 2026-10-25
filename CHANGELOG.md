@@ -1,5 +1,19 @@
 # Changelog / Journal des modifications
 
+## 0.9.17 — Zone de détection : plus de faux voisins
+
+### FR
+- **Boîte miroir (à gauche du curseur) désactivée hors bord d'écran** : elle n'est envoyée au moteur OCR que quand la boîte de capture principale déborderait du bord droit de l'écran — le seul cas où le jeu inverse l'infobulle à gauche du curseur. Au milieu de l'écran, ce tiroir ne lisait que des légendes voisines et remontait de **faux objets** (objets détectés « à gauche » de la souris).
+- **Boîte « objet au sol » réservée au raid** : elle est désormais envoyée uniquement quand le curseur OS est masqué — en raid, EFT le cache (chaque fenêtre de menu le montre). Dans l'entrepôt/flea/marchands, cette bande sous le curseur ne lisait que des libellés de voisins (faux objets « à droite »/« en dessous »). La géométrie raid validée (+13/−53, 125×40 et la bande sol −80/+30 160×30) est inchangée.
+- **Badge de transparence** : quand la lecture vient d'une boîte de secours (miroir ou zone élargie du moteur OCR), la carte l'indique dans la ligne d'attributs (« ⧉ Miroir » / « ⧉ Zone élargie ») pour rendre immédiatement lisible le recours à une boîte autre que la principale.
+- Tests : 9 unitaires Rust (les 2 nouveaux verrouillent les conditions miroir/ground), chaîne complète au vert.
+
+### EN
+- **Mirror box (left of cursor) disabled away from the screen edge**: it is sent to the OCR engine only when the primary capture box would overflow the monitor's right edge — the only case where the game flips the tooltip to the LEFT of the cursor. Mid-screen it only read neighbour captions and surfaced wrong items ("detected to the left of the mouse").
+- **Ground box reserved for raids**: now sent only while the OS cursor is hidden — EFT hides it in raid and shows it in every menu. In stash/flea/traders that strip under the cursor only read neighbour captions (wrong items "to the right"/"below"). The validated raid geometry (+13/−53 125×40, ground −80/+30 160×30) is unchanged.
+- **Transparency badge**: when a read comes from the mirrored or widened rescue box, the card shows it in the attribute line so a fallback read is instantly recognizable.
+- Tests: 9 Rust unit tests (2 new lock the mirror/ground conditions); full chain green.
+
 ## 0.9.16 — Lecture d'objet : correctif après mise à jour + table corrections
 
 ### FR

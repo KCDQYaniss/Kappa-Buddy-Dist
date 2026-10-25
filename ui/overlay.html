@@ -333,6 +333,11 @@
     if (d.caliber_display) subBits.push("⌖ " + esc(d.caliber_display));
     if (d.ammo_pack_round_name) subBits.push(esc(truncate(d.ammo_pack_round_name, 22)));
     if (d.weight) subBits.push(esc(d.weight) + " kg");
+    // Transparence : dire quand la lecture vient d'une boîte de secours et non
+    // de la principale — un « miroir »/« élargie » sur un faux voisin explique
+    // tout de suite le désaccord.
+    if (d.attempt === "mirror") subBits.push('\u29c9 Miroir');
+    else if (d.attempt === "wide") subBits.push('\u29c9 Zone élargie');
     sub.className = "o-sub" + (subBits.length ? "" : " hidden");
     sub.innerHTML = subBits.join(" · ");
 
