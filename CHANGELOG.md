@@ -1,5 +1,33 @@
 # Changelog / Journal des modifications
 
+## 0.9.13 — Quêtes ↔ carte : lieux fixes uniquement, marqueurs regroupés
+
+### FR
+- **Carte : lieux imposes uniquement** — seuls les objectifs dont l'emplacement est explicitement fixé par la quête affichent des marqueurs : zone à visiter, objet de quête à un endroit précis, sortie nommée, zone de tir.
+- **Fin des spawns génériques sur la carte** : une collecte de type « trouvez X en raid » (injecteur, clé, efedrine, arme…) ne génère plus les dizaines de points où l'objet *peut* apparaître. L'objectif reste visible dans l'onglet Quêtes.
+- **Marqueurs regroupés** : les objectifs proches ou superposés (même pièce, même porte) fusionnent en un seul marqueur ; l'infobulle liste toutes les quêtes concernées et la clé éventuellement requise (verrou du même endroit).
+- **Clic sur un marqueur** : ouvre le détail de la quête associée dans l'onglet Quêtes.
+- **Préparation de raid** : bouton « Tout cadrer » pour cadrer tous les objectifs des quêtes cochées ; l'ancien comportement de sélection multiple (cases à cocher) est conservé.
+- **« Afficher sur la carte » plus honnête** : pour une quête sans lieu fixe (collecte pure), l'application signale qu'il n'y a rien à cadrer au lieu de basculer sur une carte vide.
+- **Panneau de suivi complet** : tous les objectifs restent listés dans la fiche quête, y compris les collectes génériques (nombre, trouvé en raid…) ; la progression affichée vient des logs ou de vos coches, jamais inventée.
+
+### EN
+- **Map: fixed locations only** — only objectives whose location is explicitly imposed by the quest show markers: visit zone, quest item at a precise spot, named extract, shoot zone.
+- **No more generic item spawns on the map** — "find X in raid" collection objectives no longer draw every possible spawn point; they stay listed in the Quests tab.
+- **Grouped markers** — nearby/overlapping objectives merge into one marker; the tooltip lists every affected quest and the required key if a lock is in the same room.
+- **Click a marker** — opens the related quest details in the Quests tab.
+- **Raid prep** — new "Fit all" button frames every checked quest's objectives; the existing multi-select checkboxes are kept.
+- **Honest "show on map"** — for a quest with no fixed location (pure collection), the app says there is nothing to frame instead of switching to an empty map.
+- **Complete tracking panel** — every objective stays listed in the quest sheet (count, found-in-raid…); displayed progress comes from logs or your own ticks, never invented.
+
+## 0.9.12 — Quêtes : filtrage des objectifs et amélioration UX
+
+### FR  
+- **Filtrage intelligent des objectifs** : les objectifs de type « trouver X items » n'affichent plus tous les items disponibles dans le jeu, seulement ceux mentionnés spécifiquement dans la description de la quête ou les items principaux.
+
+### EN
+- **Intelligent objective filtering**: find-item objectives no longer show all available items in the game, only those specifically mentioned in the quest description or the main items.
+
 ## 0.9.11 — Overlay unique
 
 ### FR

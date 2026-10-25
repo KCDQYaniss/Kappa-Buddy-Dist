@@ -1,6 +1,6 @@
 {
   "name": "tarkov-tracker",
-  "version": "0.9.11",
+  "version": "0.9.13",
   "private": true,
   "scripts": {
     "maps": "python3 tools/prepare_maps.py || python tools/prepare_maps.py",
@@ -19,3 +19,4 @@
     "jsdom": "^24"
   }
 }
+

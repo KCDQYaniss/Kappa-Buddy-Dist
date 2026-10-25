@@ -513,11 +513,16 @@
     });
   }
 
-  /* ---------- Objectifs de quêtes ---------- */
+  /* ---------- Objectifs de quêtes ----------
+   * Règle : la carte indique où aller, pas où un objet peut apparaître. Un
+   * objectif ne produit un marqueur que s'il impose un lieu (zone, position
+   * imposée, sortie nommée). Une collecte générique (« trouvez X en raid »)
+   * reste listée dans l'onglet Quêtes, sans marqueur de spawns sur la carte. */
+
   function questEntries() {
     const st = TT.store, idx = st.S.idx, prog = st.S.progress;
     if (!idx || !cur) return [];
-    
+
     const out = [];
     // Parcourir toutes les tâches dans l'index
     for (const t of Object.values(idx.tasks)) {
@@ -532,12 +537,26 @@
         const maps = (o.maps || []).map((m) => slugOf(m.normalizedName));
         const zonesHere = (o.zones || []).filter((z) => z.map && slugOf(z.map.normalizedName) === cur.slug);
         const locsHere = (o.possibleLocations || []).filter((l) => l.map && slugOf(l.map.normalizedName) === cur.slug);
-        const itemIds = [...(o.items || []), ...(o.useAny || [])].map((i) => i.id);
-        const looseHere = itemIds.length && (!maps.length || maps.includes(cur.slug)) ? itemIds : [];
         const extractHere = o.type === "extract" && o.exitName && maps.includes(cur.slug);
-        // L'objectif est affiché s'il concerne la carte courante
-        if (zonesHere.length || locsHere.length || looseHere.length || extractHere || maps.includes(cur.slug)) {
-          out.push({ task: t, obj: o, zonesHere, locsHere, looseIds: looseHere, state: taskState });
+
+        // RÈGLE : un objectif ne produit de marqueur que s'il a une localisation
+        // GÉOGRAPHIQUE fixe (zones, possibleLocations) ou si c'est une sortie
+        // (extract). Les objectifs findItem/giveItem qui n'ont qu'une liste
+        // d'items → AUCUN marqueur de spawn (les items peuvent apparaître
+        // partout selon la règle #3 du cahier des charges).
+        const hasGeo = zonesHere.length || locsHere.length || extractHere;
+
+        // Un objectif "findItem"/"giveItem" peut cependant porter un questItem
+        // fixe (objet de quête à récupérer à un endroit précis). Si la liste
+        // d'items ne contient qu'un questItem, on l'affiche ; sinon (items
+        // génériques classiques), on n'affiche rien.
+        const ids = [...(o.items || []), ...(o.useAny || [])].map((i) => i.id);
+        const isFixedQuestItem = !!(o.questItem || (ids.length === 1 && idx.items && idx.items[ids[0]] && idx.items[ids[0]].types && idx.items[ids[0]].types.includes("QuestItem")));
+
+        // L'objectif est affiché s'il concerne la carte courante ET a un emplacement fixe
+        // (ou si c'est un extract), OU s'il s'agit d'un questItem fixe.
+        if (hasGeo || (isFixedQuestItem && (!maps.length || maps.includes(cur.slug)))) {
+          out.push({ task: t, obj: o, zonesHere, locsHere, state: taskState });
         }
       }
     }
@@ -559,32 +578,75 @@
     if (!shown.length) return;
     const md = mapData();
     const g = (cur.questGroup = L.layerGroup().addTo(cur.lf));
+
+    // 1) Collecter les points fixes de chaque objectif, en coordonnées monde :
+    //    zones (site imposé), possibleLocations (objet de quête à un endroit
+    //    précis), extraits (sortie nommée). Aucun spawn générique.
+    const centroid = (arr) => { let x = 0, y = 0, z = 0; for (const p of arr) { x += p.x; y += p.y; z += p.z; } const n = arr.length; return { x: x / n, y: y / n, z: z / n }; };
+    const pts = [];
     for (const e of shown) {
-      const pts = [];
       const html = `<b>${esc(e.task.name)}</b><br>${esc(e.obj.description)}`;
+      e._pts = [];
       for (const z of e.zonesHere) {
         if (z.outline && z.outline.length > 2) {
           const poly = L.polygon(z.outline.map(ll), { color: COL.quest, weight: 2, fillOpacity: 0.18 }).addTo(g);
-          tip(poly, html); pts.push(...z.outline.map(ll));
+          tip(poly, html);
+          pts.push({ w: centroid(z.outline), e }); e._pts.push(...z.outline.map(ll));
         } else if (z.position) {
-          tip(pin(ll(z.position), "quest", COL.quest, 18, {}, z.position.y).addTo(g), html); pts.push(ll(z.position));
+          pts.push({ w: z.position, e }); e._pts.push(ll(z.position));
         }
       }
-      for (const l of e.locsHere) for (const p of l.positions || []) {
-        tip(pin(ll(p), "quest", COL.quest, 15).addTo(g), html); pts.push(ll(p));
-      }
-      if (md && e.looseIds.length) {
-        const ids = new Set(e.looseIds);
-        for (const l of md.loose) if ((l.items || []).some((i) => ids.has(i.id))) {
-          tip(dot(ll(l.position), COL.quest, 4, { weight: 1 }).addTo(g), html + "<br>" + itemList(l.items)); pts.push(ll(l.position));
-        }
-      }
+      for (const l of e.locsHere) for (const p of (l.positions || [])) { pts.push({ w: p, e }); e._pts.push(ll(p)); }
       if (md && e.obj.type === "extract" && e.obj.exitName) {
         const x = md.extracts.find((m) => (m.name || "").toLowerCase() === e.obj.exitName.toLowerCase());
-        if (x) { tip(pin(ll(x.position), "extract", COL.quest, 20).addTo(g), html); pts.push(ll(x.position)); }
+        if (x) { pts.push({ w: x.position, e }); e._pts.push(ll(x.position)); }
       }
-      e.bounds = pts.length ? L.latLngBounds(pts) : null;
     }
+
+    // 2) Regrouper les points superposés ou proches (même pièce, même porte) :
+    //    un seul marqueur par groupe, infobulle listant chaque objectif distinct.
+    const CLUSTER_R = 8; // unités monde ≈ une salle
+    const clusters = [];
+    for (const p of pts) {
+      let best = null, bd = Infinity;
+      for (const c of clusters) {
+        const d = Math.hypot(p.w.x - c.x, p.w.z - c.z);
+        if (d <= CLUSTER_R && d < bd) { bd = d; best = c; }
+      }
+      if (best) best.items.push(p); else clusters.push({ x: p.w.x, z: p.w.z, w: p.w, items: [p] });
+    }
+
+    // 3) Dessin. La clé éventuellement requise est résumée d'après le verrou
+    //    le plus proche (même pièce) — conditions nécessaires, spec §2.
+    const KEY_R = 14;
+    for (const c of clusters) {
+      const parts = [], seen = new Set(), ys = [];
+      let task0 = null;
+      for (const it of c.items) {
+        if (seen.has(it.e.obj.id)) continue;
+        seen.add(it.e.obj.id);
+        if (!task0) task0 = it.e.task;
+        ys.push(it.w.y || 0);
+        parts.push(`<b>${esc(it.e.task.name)}</b><br>${esc(it.e.obj.description)}`);
+      }
+      const nObj = seen.size;
+      if (md && md.locks) {
+        let bd = Infinity, keyName = null, power = false;
+        for (const l of md.locks) {
+          const d = Math.hypot(l.position.x - c.x, l.position.z - c.z);
+          if (d < KEY_R && d < bd) { bd = d; keyName = (l.key && l.key.name) || null; power = !!l.needsPower; }
+        }
+        if (keyName) parts.push(`<div class="dim">🔑 ${esc(t("map.lock.key"))} : ${esc(keyName)}${power ? " ⚡" : ""}</div>`);
+      }
+      // Un étage homogène sert de repère de hauteur ; mélangé, le marqueur reste opaque partout.
+      const sameFloor = ys.every((v) => Math.abs(v - ys[0]) < 4);
+      const d = pin(ll(c.w), "quest", COL.quest, nObj > 1 ? 22 : 18, {}, sameFloor ? ys[0] : undefined).addTo(g);
+      tip(d, parts.join("<hr>"));
+      // Cliquer un marqueur ouvre le détail de la quête associée (spec §5).
+      d.on("click", () => { if (TT.quests) { TT.nav.show("quests"); TT.quests.select(task0.id); } });
+    }
+    // Bornes par objectif : zooms des boutons du panneau latéral.
+    for (const e of shown) e.bounds = e._pts.length ? L.latLngBounds(e._pts) : null;
   }
 
   function drawHighlight() {
@@ -614,7 +676,7 @@
       g.items.push({ e, i });
     });
     let h = `<section class="sec"><h3>${esc(t("map.questsHere"))}${groups.length ? ` <em class="cnt">${groups.length}</em>` : ""}` +
-      (groups.length > 1 ? `<span class="h3acts"><button data-act="qshowall" type="button">${esc(t("map.questsAll"))}</button><button data-act="qhideall" type="button">${esc(t("map.questsNone"))}</button></span>` : "") + "</h3>";
+      (groups.length > 1 ? `<span class="h3acts"><button data-act="qfit" type="button" title="${esc(t("map.quest.fit"))}">${esc(t("map.quest.fit"))}</button><button data-act="qshowall" type="button">${esc(t("map.questsAll"))}</button><button data-act="qhideall" type="button">${esc(t("map.questsNone"))}</button></span>` : "") + "</h3>";
     if (focusTask) h += `<div class="pill">${esc(t("map.quest.focus"))} <button class="x" data-act="clear-focus" type="button" aria-label="${esc(t("map.quest.showAll"))}">×</button></div>`;
     if (!groups.length) h += `<p class="dim">${esc(t("map.quest.none"))}</p>`;
     for (const g of groups) {
@@ -750,6 +812,12 @@
     else if (b.dataset.act === "rm-hl") removeHighlight(b.dataset.hl);
     else if (b.dataset.act === "clear-hl") { hlItems.length = 0; syncLayers(); renderSidebar(); }
     else if (b.dataset.act === "clear-focus") { focusTask = null; syncLayers(); renderSidebar(); }
+    else if (b.dataset.act === "qfit") {
+      // Préparation de raid : cadrer tous les objectifs visibles des quêtes cochées.
+      const bs = cur.questEntries.map((e) => e.bounds).filter(Boolean);
+      if (!bs.length) return;
+      cur.lf.fitBounds(bs.reduce((a, c) => a.extend(c), L.latLngBounds(bs[0].getSouthWest(), bs[0].getNorthEast())).pad(0.5), { maxZoom: cur.def.maxZoom - 1 });
+    }
     else if (b.dataset.act === "qshowall" || b.dataset.act === "qhideall") {
       const all = b.dataset.act === "qshowall";
       cur.questEntries.forEach((en) => (all ? hiddenQuests.delete(en.task.id) : hiddenQuests.add(en.task.id)));
@@ -821,6 +889,9 @@
   function focusTaskOnMap(id) {
     const st = TT.store, t = st.S.idx && st.S.idx.tasks[id];
     if (!t) return false;
+    // La carte ne cadre que des objectifs avec un lieu fixe : une quête de
+    // collecte générique (« trouvez X en raid ») n'a rien à montrer ici.
+    if (!(t.objectives || []).some((o) => (o.zones || []).length || (o.possibleLocations || []).length || (o.type === "extract" && o.exitName))) return false;
     const slugs = new Set();
     if (t.map) slugs.add(slugOf(t.map.normalizedName));
     for (const o of t.objectives || []) {

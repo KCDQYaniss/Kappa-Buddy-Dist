@@ -99,6 +99,9 @@
   }
 
   /* ---------- Détail d'une quête ---------- */
+  // Tous les objectifs restent listés ici, y compris les collectes génériques
+  // (« trouvez X en raid ») : la règle « pas de spawns génériques sur la carte »
+  // concerne les marqueurs, pas le panneau de suivi.
   function objectiveHtml(o) {
     const st = TT.store, idx = st.S.idx, done = !!st.S.progress.objectives[o.id];
     let extra = "";
@@ -150,6 +153,8 @@
     const started = st.startedTasks();
     h += `<h3>${esc(t("q.summary.todo"))}</h3>`;
     h += started.length ? '<div class="links">' + started.map((tk) => {
+      // Premier objectif à venir : géographique (où aller) ou collecte (quoi ramener),
+      // les deux restent utiles dans le résumé.
       const o = (tk.objectives || []).find((x) => !st.S.progress.objectives[x.id] && !x.optional);
       return link(tk, o ? ` <em>${esc(o.description).slice(0, 60)}</em>` : "");
     }).join("") + "</div>" : `<p class="dim">${esc(t("q.summary.none"))}</p>`;

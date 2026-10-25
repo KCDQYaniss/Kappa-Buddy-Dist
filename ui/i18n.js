@@ -136,6 +136,7 @@
     "map.quest.showAll": ["Afficher toutes les quêtes", "Show all quests", "Alle Aufträge zeigen", "Mostrar todas las misiones", "Показать все задания"],
     "map.quest.onMap": ["Afficher cette quête sur la carte", "Show this quest on the map", "Diesen Auftrag auf der Karte zeigen", "Mostrar esta misión en el mapa", "Показать задание на карте"],
     "map.quest.zoom": ["Zoomer sur les objectifs", "Zoom to the objectives", "Auf die Ziele zoomen", "Acercar a los objetivos", "Приблизить к целям"],
+    "map.quest.fit": ["Tout cadrer", "Fit all", "Alles rahmen", "Encajar todo", "Показать все"],
     "map.quest.done": ["Marquer comme fait", "Mark as done", "Als erledigt markieren", "Marcar como hecho", "Отметить как выполнено"],
     "map.quest.expand": ["Déplier", "Expand", "Ausklappen", "Desplegar", "Развернуть"],
     "map.quest.collapse": ["Replier", "Collapse", "Einklappen", "Plegar", "Свернуть"],
