@@ -6,12 +6,14 @@
 - **Une seule instance de l'app** : le plugin single-instance figurait dans les dépendances mais n'était **jamais enregistré** — un second lancement (double-clic pendant l'auto-démarrage, installé + portable, relance de l'updater) laissait deux apps tourner, chacune avec sa fenêtre overlay : la « double fenêtre » vue parfois en jeu. Désormais le second lancement met la première instance au premier plan et s'arrête.
 - **Résidus visuels réparés** : après un rétrécissement de la carte, une fenêtre transparente peut garder à l'écran les pixels de la frame précédente (les zones devenues transparentes ne sont pas repeintes par WebView2) — l'ancienne carte restait visible en fantôme. Un repaint complet du HWND est forcé après chaque resize.
 - **La carte porte le thème de l'app** : palettes identiques aux trois thèmes (Sombre Tarkov, Clair, Cyberpunk), police Chakra Petch (+ Orbitron pour le nom d'objet en Cyberpunk), liseré et accents issus des mêmes variables CSS. Le changement de thème dans l'app passe immédiatement sur la carte (événement storage) ; hors des réglages d'opacité/taille déjà existants, plus aucune couleur codée en dur.
+- **Nettoyage stylistique du crate `core`** : réagencement de code sans changement fonctionnel — aucun identifiant, aucun littéral ni valeur modifié (vérifié par comparaison lexicale mot à mot), suite de tests complète au vert après ce passage.
 - Tests : chaîne complète au vert (48 tarkov-core + 6 suites e2e + 9 Rust).
 
 ### EN
 - **Single app instance**: the single-instance plugin was listed in dependencies but **never registered** — launching the app twice (double-click during autostart, installed + portable, updater relaunch) left two apps running, each with its own overlay window: the occasional “double window”. The second launch now focuses the first instance and exits.
 - **Stale-frame fix**: after the card shrinks, a transparent window can keep previous-frame pixels on screen (WebView2 does not repaint now-transparent areas) — the old card lingered like a ghost. A full HWND repaint is forced after every resize.
 - **The card follows the app theme**: palettes identical to the three themes (Tarkov Dark, Light, Cyberpunk), Chakra Petch font (+ Orbitron for the item name in Cyberpunk), borders and accents from the same CSS variables. Theme changes in the app apply to the card instantly (storage event); no hard-coded colors beyond the existing opacity/size settings.
+- **Style-only cleanup of the `core` crate**: code re-flow with no functional change — no identifier, literal or value altered (verified by word-for-word lexical comparison); full test suite green after this pass.
 - Tests: full chain green (48 tarkov-core + 6 e2e suites + 9 Rust).
 
 ## 0.9.17 — Zone de détection : plus de faux voisins
