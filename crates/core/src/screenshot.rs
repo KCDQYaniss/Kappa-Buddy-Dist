@@ -59,10 +59,22 @@ pub fn parse_screenshot_name(name: &str) -> Option<Position> {
     let fx = 2.0 * (qx * qz + qw * qy);
     let fz = 1.0 - 2.0 * (qx * qx + qy * qy);
     let norm = (fx * fx + fz * fz).sqrt();
-    let (fx, fz) = if norm > 1e-6 { (fx / norm, fz / norm) } else { (0.0, 1.0) };
+    let (fx, fz) = if norm > 1e-6 {
+        (fx / norm, fz / norm)
+    } else {
+        (0.0, 1.0)
+    };
     let yaw_deg = fx.atan2(fz).to_degrees();
 
-    Some(Position { x, y, z, fx, fz, yaw_deg, file: name.to_string() })
+    Some(Position {
+        x,
+        y,
+        z,
+        fx,
+        fz,
+        yaw_deg,
+        file: name.to_string(),
+    })
 }
 
 #[cfg(test)]
@@ -85,7 +97,8 @@ mod tests {
 
     #[test]
     fn regard_vers_z_positif() {
-        let p = parse_screenshot_name("2024-01-15[21-04]_1.00, 2.00, 3.00_0, 0, 0, 1_0.0 (0).png").unwrap();
+        let p = parse_screenshot_name("2024-01-15[21-04]_1.00, 2.00, 3.00_0, 0, 0, 1_0.0 (0).png")
+            .unwrap();
         assert!(p.yaw_deg.abs() < 1e-6);
         assert!((p.fz - 1.0).abs() < 1e-9);
     }
@@ -93,7 +106,8 @@ mod tests {
     #[test]
     fn sans_underscore_entre_z_et_rotation() {
         // TarkovMonitor tolère un `_` optionnel à cet endroit ; nous aussi.
-        let p = parse_screenshot_name("2024-01-15[21-04]_1.00, 2.00, 3.00, 0, 0, 0, 1 (0).png").unwrap();
+        let p = parse_screenshot_name("2024-01-15[21-04]_1.00, 2.00, 3.00, 0, 0, 0, 1 (0).png")
+            .unwrap();
         assert_eq!((p.x, p.y, p.z), (1.0, 2.0, 3.0));
     }
 
@@ -101,12 +115,18 @@ mod tests {
     fn rejette_les_autres_fichiers() {
         assert!(parse_screenshot_name("capture.png").is_none());
         assert!(parse_screenshot_name("2024-01-15[21-04]_1, 2, 3 (0).png").is_none());
-        assert!(parse_screenshot_name("2024-01-15[21-04]_1.00, 2.00, 3.00_0, 0, 0, 1_0.0 (0).jpg").is_none());
+        assert!(
+            parse_screenshot_name("2024-01-15[21-04]_1.00, 2.00, 3.00_0, 0, 0, 1_0.0 (0).jpg")
+                .is_none()
+        );
         assert!(parse_screenshot_name("").is_none());
     }
 
     #[test]
     fn extension_majuscule() {
-        assert!(parse_screenshot_name("2024-01-15[21-04]_1.00, 2.00, 3.00_0, 0, 0, 1_0.0 (0).PNG").is_some());
+        assert!(
+            parse_screenshot_name("2024-01-15[21-04]_1.00, 2.00, 3.00_0, 0, 0, 1_0.0 (0).PNG")
+                .is_some()
+        );
     }
 }

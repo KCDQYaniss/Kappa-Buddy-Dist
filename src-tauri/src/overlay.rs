@@ -945,6 +945,27 @@ pub fn resize_overlay_window(app: &AppHandle, width: f64, height: f64) -> Result
         .set_size(LogicalSize::new(w, h))
         .map_err(|e| e.to_string())?;
     let _ = position_overlay_by_anchor(app, Some(w), Some(h));
+    // Une fenêtre transparente rétrécie peut laisser à l'écran les pixels de la
+    // frame précédente (les zones devenues transparentes ne sont pas
+    // redessinées par WebView2) : l'utilisateur voyait l'ancienne carte ET la
+    // nouvelle — la « double fenêtre ». Invalidier TOUT le HWND force un
+    // repaint complet ; les enfants composés au-dessus sont rappelés.
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::Graphics::Gdi::{
+            RedrawWindow, RDW_ALLCHILDREN, RDW_INVALIDATE, RDW_UPDATENOW,
+        };
+        if let Ok(hwnd) = window.hwnd() {
+            unsafe {
+                RedrawWindow(
+                    hwnd.0 as _,
+                    std::ptr::null(),
+                    std::ptr::null_mut(),
+                    RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW,
+                );
+            }
+        }
+    }
     Ok(())
 }
 

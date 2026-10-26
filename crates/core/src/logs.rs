@@ -35,11 +35,19 @@ pub struct MapHit {
 pub fn parse_map_any(line: &str) -> Option<MapHit> {
     if let Some(raw) = parse_map_line(line) {
         let slug = maps::slug_from_location(&raw);
-        return Some(MapHit { raw, slug, from_scene: false });
+        return Some(MapHit {
+            raw,
+            slug,
+            from_scene: false,
+        });
     }
     let stem = parse_scene_line(line)?;
     let slug = maps::slug_from_scene(&stem);
-    Some(MapHit { raw: stem, slug, from_scene: true })
+    Some(MapHit {
+        raw: stem,
+        slug,
+        from_scene: true,
+    })
 }
 
 /// Nom du bundle de scène (`bigmap_preset`) dans une ligne `scene preset path:maps/bigmap_preset.bundle`.
@@ -49,17 +57,27 @@ pub fn parse_scene_line(line: &str) -> Option<String> {
     }
     let rest = &line[line.find("maps/")? + 5..];
     let stem = &rest[..rest.find(".bundle")?];
-    (!stem.is_empty() && stem.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')).then(|| stem.to_string())
+    (!stem.is_empty() && stem.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'))
+        .then(|| stem.to_string())
 }
 
 /// Masque les valeurs sensibles (identifiants, adresses) avant d'afficher une ligne de log dans le diagnostic.
 pub fn redact(line: &str) -> String {
     let mut out = line.to_string();
-    for key in ["ProfileId: ", "Ip: ", "Sid: ", "AccountId: ", "Port: ", "shortId: "] {
+    for key in [
+        "ProfileId: ",
+        "Ip: ",
+        "Sid: ",
+        "AccountId: ",
+        "Port: ",
+        "shortId: ",
+    ] {
         let mut from = 0;
         while let Some(i) = out[from..].find(key) {
             let start = from + i + key.len();
-            let end = out[start..].find(|c| c == ',' || c == '\'' || c == ' ').map_or(out.len(), |e| start + e);
+            let end = out[start..]
+                .find(|c| c == ',' || c == '\'' || c == ' ')
+                .map_or(out.len(), |e| start + e);
             out.replace_range(start..end, "***");
             from = start + 3;
         }
@@ -71,7 +89,9 @@ pub fn redact(line: &str) -> String {
 fn log_stem(path: &Path) -> Option<&str> {
     let name = path.file_name()?.to_str()?.strip_suffix(".log")?;
     match name.rfind('_') {
-        Some(i) if i + 1 < name.len() && name[i + 1..].bytes().all(|b| b.is_ascii_digit()) => Some(&name[..i]),
+        Some(i) if i + 1 < name.len() && name[i + 1..].bytes().all(|b| b.is_ascii_digit()) => {
+            Some(&name[..i])
+        }
         _ => Some(name),
     }
 }
@@ -166,7 +186,11 @@ pub fn parse_task_json(json: &str, at: i64) -> Option<TaskEvent> {
     if id.len() != 24 || !id.bytes().all(|c| c.is_ascii_hexdigit()) {
         return None;
     }
-    Some(TaskEvent { id: id.to_ascii_lowercase(), status, at })
+    Some(TaskEvent {
+        id: id.to_ascii_lowercase(),
+        status,
+        at,
+    })
 }
 
 /// Reconstitue les entrées multi-lignes de `notifications.log` :
@@ -231,16 +255,27 @@ pub fn scan_task_history_report(logs_dir: &Path) -> ScanReport {
         .collect();
     dirs.sort_by_key(|(m, _)| *m);
 
-    let mut rep = ScanReport { sessions: dirs.len(), ..Default::default() };
+    let mut rep = ScanReport {
+        sessions: dirs.len(),
+        ..Default::default()
+    };
     for (_, dir) in dirs {
-        let Ok(rd) = std::fs::read_dir(&dir) else { continue };
-        let mut files: Vec<PathBuf> = rd.filter_map(Result::ok).map(|e| e.path()).filter(|p| is_notifications_log(p)).collect();
+        let Ok(rd) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        let mut files: Vec<PathBuf> = rd
+            .filter_map(Result::ok)
+            .map(|e| e.path())
+            .filter(|p| is_notifications_log(p))
+            .collect();
         files.sort();
         for p in files {
             let Ok(file) = File::open(&p) else { continue };
             rep.files += 1;
             let mut parser = NotifParser::default();
-            for raw in std::io::BufRead::split(std::io::BufReader::new(file), b'\n').filter_map(Result::ok) {
+            for raw in
+                std::io::BufRead::split(std::io::BufReader::new(file), b'\n').filter_map(Result::ok)
+            {
                 let line = String::from_utf8_lossy(&raw);
                 if let Some(ev) = parser.push(line.trim_end_matches('\r')) {
                     rep.events.push(ev);
@@ -276,10 +311,14 @@ pub fn latest_log_dir(logs_dir: &Path) -> Option<PathBuf> {
 pub fn last_map_in_file(path: &Path, tail_bytes: u64) -> Option<MapHit> {
     let mut f = File::open(path).ok()?;
     let len = f.metadata().ok()?.len();
-    f.seek(SeekFrom::Start(len.saturating_sub(tail_bytes))).ok()?;
+    f.seek(SeekFrom::Start(len.saturating_sub(tail_bytes)))
+        .ok()?;
     let mut buf = Vec::new();
     f.read_to_end(&mut buf).ok()?;
-    String::from_utf8_lossy(&buf).lines().filter_map(parse_map_any).last()
+    String::from_utf8_lossy(&buf)
+        .lines()
+        .filter_map(parse_map_any)
+        .last()
 }
 
 /// Lecture incrémentale : on ne relit jamais un fichier depuis le début.
@@ -298,8 +337,12 @@ impl Tail {
 
     /// Retourne les nouvelles lignes complètes depuis le dernier appel.
     pub fn read_new(&mut self, path: &Path) -> Vec<String> {
-        let Ok(mut f) = File::open(path) else { return vec![] };
-        let Ok(meta) = f.metadata() else { return vec![] };
+        let Ok(mut f) = File::open(path) else {
+            return vec![];
+        };
+        let Ok(meta) = f.metadata() else {
+            return vec![];
+        };
         let off = self.offsets.entry(path.to_path_buf()).or_insert(0);
         if meta.len() < *off {
             // Fichier tronqué ou recréé.
@@ -310,13 +353,18 @@ impl Tail {
             return vec![];
         }
         let mut buf = Vec::new();
-        let Ok(n) = f.read_to_end(&mut buf) else { return vec![] };
+        let Ok(n) = f.read_to_end(&mut buf) else {
+            return vec![];
+        };
         *off += n as u64;
 
         let mut text = self.pending.remove(path).unwrap_or_default();
         text.push_str(&String::from_utf8_lossy(&buf));
 
-        let mut lines: Vec<String> = text.split('\n').map(|l| l.trim_end_matches('\r').to_string()).collect();
+        let mut lines: Vec<String> = text
+            .split('\n')
+            .map(|l| l.trim_end_matches('\r').to_string())
+            .collect();
         // Le dernier morceau est soit vide (le texte finissait par \n), soit une ligne incomplète.
         let last = lines.pop().unwrap_or_default();
         if !last.is_empty() {
@@ -343,7 +391,10 @@ mod tests {
     #[test]
     fn detecte_la_map() {
         assert_eq!(parse_map_line(LIGNE).as_deref(), Some("bigmap"));
-        assert_eq!(parse_map_line("2024-01-15 application|autre chose Location: bigmap,"), None);
+        assert_eq!(
+            parse_map_line("2024-01-15 application|autre chose Location: bigmap,"),
+            None
+        );
     }
 
     #[test]
@@ -352,8 +403,14 @@ mod tests {
         assert_eq!(parse_scene_line(l).as_deref(), Some("bigmap_preset"));
         assert_eq!(parse_scene_line("2026|x|application|autre"), None);
         let r = redact(LIGNE);
-        assert!(!r.contains("1.2.3.4") && !r.contains("ProfileId: abc") && !r.contains("AB12CD"), "{r}");
-        assert!(r.contains("Location: bigmap"), "la map doit rester lisible : {r}");
+        assert!(
+            !r.contains("1.2.3.4") && !r.contains("ProfileId: abc") && !r.contains("AB12CD"),
+            "{r}"
+        );
+        assert!(
+            r.contains("Location: bigmap"),
+            "la map doit rester lisible : {r}"
+        );
     }
 
     #[test]
@@ -371,7 +428,9 @@ mod tests {
 
     #[test]
     fn nom_de_fichier_log() {
-        assert!(is_application_log(Path::new("/x/2024.01.15_21-04-11_0.15 application.log")));
+        assert!(is_application_log(Path::new(
+            "/x/2024.01.15_21-04-11_0.15 application.log"
+        )));
         assert!(is_notifications_log(Path::new("/x/notifications.log")));
         assert!(!is_application_log(Path::new("/x/notifications.log")));
     }
@@ -379,26 +438,53 @@ mod tests {
     #[test]
     fn noms_de_fichier_avec_suffixe_de_rotation() {
         // Les versions récentes du jeu écrivent `..._000.log` : c'est ce qui empêchait la synchro des quêtes.
-        for n in ["2026.10.04_21-04-11_1.0.0.0.42157 notifications_000.log", "x push-notifications_001.log", "x notifications.log", "x push-notifications.log"] {
+        for n in [
+            "2026.10.04_21-04-11_1.0.0.0.42157 notifications_000.log",
+            "x push-notifications_001.log",
+            "x notifications.log",
+            "x push-notifications.log",
+        ] {
             assert!(is_notifications_log(Path::new(n)), "{n}");
             assert!(!is_application_log(Path::new(n)), "{n}");
         }
-        for n in ["2026.10.04_21-04-11_1.0.0.0.42157 application_000.log", "x application.log", "x application_012.log"] {
+        for n in [
+            "2026.10.04_21-04-11_1.0.0.0.42157 application_000.log",
+            "x application.log",
+            "x application_012.log",
+        ] {
             assert!(is_application_log(Path::new(n)), "{n}");
             assert!(!is_notifications_log(Path::new(n)), "{n}");
         }
-        for n in ["x network-connection_000.log", "x backend_000.log", "notifications.txt", "x errors.log"] {
-            assert!(!is_notifications_log(Path::new(n)) && !is_application_log(Path::new(n)), "{n}");
+        for n in [
+            "x network-connection_000.log",
+            "x backend_000.log",
+            "notifications.txt",
+            "x errors.log",
+        ] {
+            assert!(
+                !is_notifications_log(Path::new(n)) && !is_application_log(Path::new(n)),
+                "{n}"
+            );
         }
     }
 
     #[test]
     fn horodatage_des_entetes() {
         // 2024-01-15 21:04:11.123 +01:00  =  2024-01-15 20:04:11.123 UTC
-        assert_eq!(header_epoch_ms("2024-01-15 21:04:11.123 +01:00|0.15|Info|x"), Some(1_705_349_051_123));
+        assert_eq!(
+            header_epoch_ms("2024-01-15 21:04:11.123 +01:00|0.15|Info|x"),
+            Some(1_705_349_051_123)
+        );
         assert_eq!(header_epoch_ms("1970-01-01 00:00:00.000 +00:00|x"), Some(0));
-        assert_eq!(header_epoch_ms("2024-03-10 04:00:00.500 -05:00|x"), Some(1_710_061_200_500));
-        assert_eq!(header_epoch_ms("2024-01-15 21:04:11 +01:00|x"), Some(1_705_349_051_000), "sans millisecondes");
+        assert_eq!(
+            header_epoch_ms("2024-03-10 04:00:00.500 -05:00|x"),
+            Some(1_710_061_200_500)
+        );
+        assert_eq!(
+            header_epoch_ms("2024-01-15 21:04:11 +01:00|x"),
+            Some(1_705_349_051_000),
+            "sans millisecondes"
+        );
         assert_eq!(header_epoch_ms("pas une date|x"), None);
         assert_eq!(header_epoch_ms("2024-13-15 21:04:11.123 +01:00|x"), None);
     }
@@ -445,15 +531,28 @@ mod tests {
     #[test]
     fn quete_terminee() {
         let ev = feed(&mut NotifParser::default(), NOTIF);
-        assert_eq!(ev, vec![TaskEvent { id: "5936d90786f7742b1420ba5b".into(), status: TaskStatus::Finished, at: 1_705_349_051_123 }]);
+        assert_eq!(
+            ev,
+            vec![TaskEvent {
+                id: "5936d90786f7742b1420ba5b".into(),
+                status: TaskStatus::Finished,
+                at: 1_705_349_051_123
+            }]
+        );
     }
 
     #[test]
     fn quete_demarree_et_echouee() {
         let s = NOTIF.replace("\"type\": 12", "\"type\": 10");
-        assert_eq!(feed(&mut NotifParser::default(), &s)[0].status, TaskStatus::Started);
+        assert_eq!(
+            feed(&mut NotifParser::default(), &s)[0].status,
+            TaskStatus::Started
+        );
         let f = NOTIF.replace("\"type\": 12", "\"type\": 11");
-        assert_eq!(feed(&mut NotifParser::default(), &f)[0].status, TaskStatus::Failed);
+        assert_eq!(
+            feed(&mut NotifParser::default(), &f)[0].status,
+            TaskStatus::Failed
+        );
     }
 
     #[test]
@@ -487,7 +586,10 @@ mod tests {
             std::thread::sleep(std::time::Duration::from_millis(30));
         }
         let ev = scan_task_history(&d);
-        assert_eq!(ev.iter().map(|e| e.status).collect::<Vec<_>>(), vec![TaskStatus::Started, TaskStatus::Finished]);
+        assert_eq!(
+            ev.iter().map(|e| e.status).collect::<Vec<_>>(),
+            vec![TaskStatus::Started, TaskStatus::Finished]
+        );
     }
 
     #[test]
@@ -497,12 +599,28 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let tard = NOTIF.replace("2024-01-15 21:04:11.123", "2024-01-16 10:00:00.000");
         // Le fichier le plus récent porte le nom qui vient en premier : seuls les horodatages doivent décider.
-        std::fs::write(dir.join("2026.10.04_21-04-11_1.0 a notifications_000.log"), tard.replace("\"type\": 12", "\"type\": 11")).unwrap();
-        std::fs::write(dir.join("2026.10.04_21-04-11_1.0 b notifications_001.log"), NOTIF).unwrap();
-        std::fs::write(dir.join("2026.10.04_21-04-11_1.0 application_000.log"), "bruit\n").unwrap();
+        std::fs::write(
+            dir.join("2026.10.04_21-04-11_1.0 a notifications_000.log"),
+            tard.replace("\"type\": 12", "\"type\": 11"),
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("2026.10.04_21-04-11_1.0 b notifications_001.log"),
+            NOTIF,
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("2026.10.04_21-04-11_1.0 application_000.log"),
+            "bruit\n",
+        )
+        .unwrap();
         let r = scan_task_history_report(&d);
         assert_eq!((r.sessions, r.files, r.events.len()), (1, 2, 2));
-        assert_eq!(r.events[0].status, TaskStatus::Finished, "plus ancien d'abord");
+        assert_eq!(
+            r.events[0].status,
+            TaskStatus::Finished,
+            "plus ancien d'abord"
+        );
         assert_eq!(r.events[1].status, TaskStatus::Failed);
         assert!(r.events[0].at < r.events[1].at);
     }
@@ -513,6 +631,9 @@ mod tests {
         let p = d.join("application.log");
         let autre = LIGNE.replace("bigmap", "Woods");
         std::fs::write(&p, format!("{LIGNE}\nbruit\n{autre}\nbruit\n")).unwrap();
-        assert_eq!(last_map_in_file(&p, 1 << 20).map(|h| h.raw).as_deref(), Some("Woods"));
+        assert_eq!(
+            last_map_in_file(&p, 1 << 20).map(|h| h.raw).as_deref(),
+            Some("Woods")
+        );
     }
 }

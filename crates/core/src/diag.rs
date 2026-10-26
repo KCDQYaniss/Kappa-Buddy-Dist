@@ -60,19 +60,35 @@ pub struct Diagnostics {
 
 impl Diagnostics {
     /// Enregistre un point : le titre sert aussi de résumé dans `hints`.
-    fn issue(&mut self, severity: &str, title: impl Into<String>, detail: impl Into<String>, fix: impl Into<String>) {
+    fn issue(
+        &mut self,
+        severity: &str,
+        title: impl Into<String>,
+        detail: impl Into<String>,
+        fix: impl Into<String>,
+    ) {
         let title = title.into();
         self.hints.push(title.clone());
-        self.issues.push(Issue { severity: severity.into(), title, detail: detail.into(), fix: fix.into() });
+        self.issues.push(Issue {
+            severity: severity.into(),
+            title,
+            detail: detail.into(),
+            fix: fix.into(),
+        });
     }
 }
 
 fn ago(t: Option<SystemTime>) -> Option<u64> {
-    SystemTime::now().duration_since(t?).ok().map(|d| d.as_secs())
+    SystemTime::now()
+        .duration_since(t?)
+        .ok()
+        .map(|d| d.as_secs())
 }
 
 fn read_tail(path: &Path, bytes: u64) -> String {
-    let Ok(mut f) = File::open(path) else { return String::new() };
+    let Ok(mut f) = File::open(path) else {
+        return String::new();
+    };
     let len = f.metadata().map(|m| m.len()).unwrap_or(0);
     let _ = f.seek(SeekFrom::Start(len.saturating_sub(bytes)));
     let mut buf = Vec::new();
@@ -81,11 +97,24 @@ fn read_tail(path: &Path, bytes: u64) -> String {
 }
 
 pub fn diagnose(manual_logs: Option<&Path>, screenshots: &Path) -> Diagnostics {
-    let mut d = Diagnostics { screenshots_dir: screenshots.display().to_string(), screenshots_dir_exists: screenshots.is_dir(), ..Default::default() };
+    let mut d = Diagnostics {
+        screenshots_dir: screenshots.display().to_string(),
+        screenshots_dir_exists: screenshots.is_dir(),
+        ..Default::default()
+    };
 
     // --- Où sont les logs ? ---
     let candidates = paths::log_dir_candidates();
-    d.tried = candidates.iter().map(|p| format!("{} : {}", p.display(), if p.is_dir() { "existe" } else { "absent" })).collect();
+    d.tried = candidates
+        .iter()
+        .map(|p| {
+            format!(
+                "{} : {}",
+                p.display(),
+                if p.is_dir() { "existe" } else { "absent" }
+            )
+        })
+        .collect();
     let logs: Option<PathBuf> = match manual_logs {
         Some(m) if m.is_dir() => {
             d.logs_dir_source = "réglage manuel".into();
@@ -96,7 +125,8 @@ pub fn diagnose(manual_logs: Option<&Path>, screenshots: &Path) -> Diagnostics {
                 ERROR,
                 format!("Le dossier de logs indiqué n'existe pas : {}", m.display()),
                 "Réglages → « Dossier des logs du jeu » pointe vers un dossier absent.".to_string(),
-                "Corrige le chemin, ou vide le champ pour laisser la détection automatique.".to_string(),
+                "Corrige le chemin, ou vide le champ pour laisser la détection automatique."
+                    .to_string(),
             );
             d.logs_dir_source = "réglage manuel (introuvable)".into();
             None
@@ -122,7 +152,11 @@ pub fn diagnose(manual_logs: Option<&Path>, screenshots: &Path) -> Diagnostics {
 
     // --- Sessions et fichiers ---
     d.sessions = std::fs::read_dir(&logs)
-        .map(|rd| rd.filter_map(Result::ok).filter(|e| e.file_name().to_string_lossy().starts_with("log_")).count())
+        .map(|rd| {
+            rd.filter_map(Result::ok)
+                .filter(|e| e.file_name().to_string_lossy().starts_with("log_"))
+                .count()
+        })
         .unwrap_or(0);
     if d.sessions == 0 {
         d.issue(
@@ -133,7 +167,9 @@ pub fn diagnose(manual_logs: Option<&Path>, screenshots: &Path) -> Diagnostics {
         );
         return finish(d, screenshots);
     }
-    let Some(latest) = logs::latest_log_dir(&logs) else { return finish(d, screenshots) };
+    let Some(latest) = logs::latest_log_dir(&logs) else {
+        return finish(d, screenshots);
+    };
     d.latest_session = latest.file_name().map(|n| n.to_string_lossy().into_owned());
 
     let mut app_log: Option<(Option<SystemTime>, PathBuf)> = None;
@@ -143,10 +179,18 @@ pub fn diagnose(manual_logs: Option<&Path>, screenshots: &Path) -> Diagnostics {
             let p = e.path();
             let Ok(m) = e.metadata() else { continue };
             if p.extension().map_or(false, |x| x == "log") && d.files.len() < 20 {
-                d.files.push(FileInfo { name: e.file_name().to_string_lossy().into_owned(), bytes: m.len(), modified_secs_ago: ago(m.modified().ok()) });
+                d.files.push(FileInfo {
+                    name: e.file_name().to_string_lossy().into_owned(),
+                    bytes: m.len(),
+                    modified_secs_ago: ago(m.modified().ok()),
+                });
             }
             // Plusieurs fichiers de rotation possibles : pour la map on prend le plus récent, pour les quêtes on les lit tous.
-            if logs::is_application_log(&p) && app_log.as_ref().map_or(true, |(t, _)| m.modified().ok() >= *t) {
+            if logs::is_application_log(&p)
+                && app_log
+                    .as_ref()
+                    .map_or(true, |(t, _)| m.modified().ok() >= *t)
+            {
                 app_log = Some((m.modified().ok(), p.clone()));
             }
             if logs::is_notifications_log(&p) {
@@ -162,8 +206,12 @@ pub fn diagnose(manual_logs: Option<&Path>, screenshots: &Path) -> Diagnostics {
         None => d.issue(
             ERROR,
             "Aucun fichier « application.log » dans la dernière session".to_string(),
-            format!("Session {} : aucun fichier d'application trouvé.", d.latest_session.as_deref().unwrap_or("?")),
-            "Lance une partie (au moins jusqu'au chargement du raid) puis relance ce diagnostic.".to_string(),
+            format!(
+                "Session {} : aucun fichier d'application trouvé.",
+                d.latest_session.as_deref().unwrap_or("?")
+            ),
+            "Lance une partie (au moins jusqu'au chargement du raid) puis relance ce diagnostic."
+                .to_string(),
         ),
         Some((_, p)) => {
             let text = read_tail(&p, 4 * 1024 * 1024);
@@ -172,7 +220,16 @@ pub fn diagnose(manual_logs: Option<&Path>, screenshots: &Path) -> Diagnostics {
                 d.last_map_raw = Some(hit.raw);
                 d.last_map_slug = hit.slug.map(str::to_string);
             }
-            d.recent_lines = text.lines().rev().filter(|l| !l.trim().is_empty()).take(4).map(logs::redact).collect::<Vec<_>>().into_iter().rev().collect();
+            d.recent_lines = text
+                .lines()
+                .rev()
+                .filter(|l| !l.trim().is_empty())
+                .take(4)
+                .map(logs::redact)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect();
             if d.last_map_raw.is_none() {
                 d.issue(
                     WARN,
@@ -183,9 +240,14 @@ pub fn diagnose(manual_logs: Option<&Path>, screenshots: &Path) -> Diagnostics {
             } else if d.last_map_slug.is_none() {
                 d.issue(
                     WARN,
-                    format!("Map « {} » trouvée mais non reconnue", d.last_map_raw.as_deref().unwrap_or("")),
-                    "Le nom de la carte dans le log ne correspond à aucune carte connue.".to_string(),
-                    "Signale-le : la correspondance sera ajoutée dans une prochaine version.".to_string(),
+                    format!(
+                        "Map « {} » trouvée mais non reconnue",
+                        d.last_map_raw.as_deref().unwrap_or("")
+                    ),
+                    "Le nom de la carte dans le log ne correspond à aucune carte connue."
+                        .to_string(),
+                    "Signale-le : la correspondance sera ajoutée dans une prochaine version."
+                        .to_string(),
                 );
             }
         }
@@ -196,15 +258,22 @@ pub fn diagnose(manual_logs: Option<&Path>, screenshots: &Path) -> Diagnostics {
         d.issue(
             WARN,
             "Aucun fichier de notifications dans la dernière session".to_string(),
-            "Sans lui, les quêtes démarrées ou terminées en jeu ne peuvent pas être détectées.".to_string(),
-            "Vérifie le dossier des logs, puis lance une partie et relance ce diagnostic.".to_string(),
+            "Sans lui, les quêtes démarrées ou terminées en jeu ne peuvent pas être détectées."
+                .to_string(),
+            "Vérifie le dossier des logs, puis lance une partie et relance ce diagnostic."
+                .to_string(),
         );
     }
     for p in &notif_logs {
         let mut parser = logs::NotifParser::default();
         if let Ok(f) = File::open(p) {
-            for raw in std::io::BufRead::split(std::io::BufReader::new(f), b'\n').filter_map(Result::ok) {
-                if parser.push(String::from_utf8_lossy(&raw).trim_end_matches('\r')).is_some() {
+            for raw in
+                std::io::BufRead::split(std::io::BufReader::new(f), b'\n').filter_map(Result::ok)
+            {
+                if parser
+                    .push(String::from_utf8_lossy(&raw).trim_end_matches('\r'))
+                    .is_some()
+                {
                     d.task_events_latest_session += 1;
                 }
             }
@@ -224,7 +293,8 @@ pub fn diagnose(manual_logs: Option<&Path>, screenshots: &Path) -> Diagnostics {
                 WARN,
                 "La dernière session de logs date d'il y a plus d'un jour".to_string(),
                 format!("Fichiers modifiés il y a {} h.", age / 3600),
-                "Le suivi en direct reprendra dès que le jeu écrira dans un nouveau log.".to_string(),
+                "Le suivi en direct reprendra dès que le jeu écrira dans un nouveau log."
+                    .to_string(),
             );
         }
     }
@@ -245,7 +315,12 @@ fn finish(mut d: Diagnostics, screenshots: &Path) -> Diagnostics {
             .into_iter()
             .flatten()
             .filter_map(Result::ok)
-            .filter_map(|e| Some((e.metadata().ok()?.modified().ok()?, e.file_name().to_string_lossy().into_owned())))
+            .filter_map(|e| {
+                Some((
+                    e.metadata().ok()?.modified().ok()?,
+                    e.file_name().to_string_lossy().into_owned(),
+                ))
+            })
             .max_by_key(|(t, _)| *t);
         match newest {
             Some((t, n)) => {
@@ -266,7 +341,8 @@ fn finish(mut d: Diagnostics, screenshots: &Path) -> Diagnostics {
                 WARN,
                 "Aucune capture d'écran dans le dossier".to_string(),
                 format!("{} est vide.", screenshots.display()),
-                "Prends une capture en jeu avec la touche dédiée : la position se mettra à jour.".to_string(),
+                "Prends une capture en jeu avec la touche dédiée : la position se mettra à jour."
+                    .to_string(),
             ),
         }
     }
@@ -317,7 +393,13 @@ mod tests {
         let d = diagnose(Some(&logs), &tmp("s3"));
         assert_eq!(d.last_map_slug.as_deref(), Some("customs"));
         assert_eq!(d.location_lines, 1);
-        assert!(d.recent_lines.iter().all(|l| !l.contains("9.9.9.9") && !l.contains("abc")), "{:?}", d.recent_lines);
+        assert!(
+            d.recent_lines
+                .iter()
+                .all(|l| !l.contains("9.9.9.9") && !l.contains("abc")),
+            "{:?}",
+            d.recent_lines
+        );
         assert_eq!(d.sessions, 1);
         assert_eq!(d.files.len(), 2);
     }
@@ -327,12 +409,25 @@ mod tests {
         let logs = tmp("l5");
         let s = logs.join("log_2026.10.04_10-00-00_1.0");
         std::fs::create_dir_all(&s).unwrap();
-        let evt = |id: &str| format!("2026-10-04 10:00:00.000 +02:00|1.0|Info|push-notifications|Got notification | ChatMessageReceived\n{{\n \"message\": {{\n  \"type\": 12,\n  \"templateId\": \"{id} successMessageText 0\"\n }}\n}}\n");
-        std::fs::write(s.join("x notifications_000.log"), evt("5936d90786f7742b1420ba5b")).unwrap();
-        std::fs::write(s.join("x notifications_001.log"), evt("5a27b75b86f7742e97191958")).unwrap();
+        let evt = |id: &str| {
+            format!("2026-10-04 10:00:00.000 +02:00|1.0|Info|push-notifications|Got notification | ChatMessageReceived\n{{\n \"message\": {{\n  \"type\": 12,\n  \"templateId\": \"{id} successMessageText 0\"\n }}\n}}\n")
+        };
+        std::fs::write(
+            s.join("x notifications_000.log"),
+            evt("5936d90786f7742b1420ba5b"),
+        )
+        .unwrap();
+        std::fs::write(
+            s.join("x notifications_001.log"),
+            evt("5a27b75b86f7742e97191958"),
+        )
+        .unwrap();
         let d = diagnose(Some(&logs), &tmp("s5"));
         assert_eq!(d.task_events_latest_session, 2);
-        assert!(!d.hints.iter().any(|h| h.contains("Aucun fichier de notifications")));
+        assert!(!d
+            .hints
+            .iter()
+            .any(|h| h.contains("Aucun fichier de notifications")));
     }
 
     #[test]

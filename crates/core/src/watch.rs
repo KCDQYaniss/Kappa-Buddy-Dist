@@ -24,7 +24,11 @@ pub struct MapInfo {
 
 impl From<MapHit> for MapInfo {
     fn from(h: MapHit) -> Self {
-        MapInfo { raw: h.raw, slug: h.slug.map(str::to_string), from_scene: h.from_scene }
+        MapInfo {
+            raw: h.raw,
+            slug: h.slug.map(str::to_string),
+            from_scene: h.from_scene,
+        }
     }
 }
 
@@ -91,7 +95,9 @@ fn process_log(state: &Mutex<LogState>, path: &Path, sink: &Sink) {
 }
 
 fn session_logs(logs_dir: &Path) -> Vec<PathBuf> {
-    let Some(latest) = logs::latest_log_dir(logs_dir) else { return vec![] };
+    let Some(latest) = logs::latest_log_dir(logs_dir) else {
+        return vec![];
+    };
     std::fs::read_dir(latest)
         .into_iter()
         .flatten()
@@ -116,12 +122,19 @@ where
         let delete = cfg.delete_screenshots;
         let handler = move |res: notify::Result<notify::Event>| {
             let Ok(ev) = res else { return };
-            if !matches!(ev.kind, EventKind::Create(_) | EventKind::Modify(ModifyKind::Name(_))) {
+            if !matches!(
+                ev.kind,
+                EventKind::Create(_) | EventKind::Modify(ModifyKind::Name(_))
+            ) {
                 return;
             }
             for path in ev.paths {
-                let Some(name) = path.file_name().and_then(|n| n.to_str()) else { continue };
-                let Some(pos) = parse_screenshot_name(name) else { continue };
+                let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+                    continue;
+                };
+                let Some(pos) = parse_screenshot_name(name) else {
+                    continue;
+                };
                 {
                     let mut l = last.lock().unwrap();
                     if *l == name {
@@ -146,7 +159,9 @@ where
         match notify::recommended_watcher(handler) {
             Ok(mut w) => match w.watch(&cfg.screenshots_dir, RecursiveMode::NonRecursive) {
                 Ok(()) => watchers.push(w),
-                Err(e) => sink(Event::Warning(format!("Surveillance des screenshots impossible : {e}"))),
+                Err(e) => sink(Event::Warning(format!(
+                    "Surveillance des screenshots impossible : {e}"
+                ))),
             },
             Err(e) => sink(Event::Warning(format!("Watcher screenshots : {e}"))),
         }
@@ -215,7 +230,10 @@ where
         )),
     }
 
-    Handle { _watchers: watchers, stop }
+    Handle {
+        _watchers: watchers,
+        stop,
+    }
 }
 
 #[cfg(test)]
@@ -243,10 +261,24 @@ mod tests {
     #[test]
     fn un_screenshot_cree_emet_une_position() {
         let shots = tmp("shots");
-        let (_h, rx) = collect(Config { screenshots_dir: shots.clone(), logs_dir: None, delete_screenshots: false });
-        assert!(matches!(rx.recv_timeout(Duration::from_secs(2)).unwrap(), Event::Warning(_)));
-        std::fs::write(shots.join("2024-01-15[21-04]_10.00, 5.00, -20.00_0, 0, 0, 1_3.0 (0).png"), b"png").unwrap();
-        match rx.recv_timeout(Duration::from_secs(3)).expect("pas d'évènement reçu") {
+        let (_h, rx) = collect(Config {
+            screenshots_dir: shots.clone(),
+            logs_dir: None,
+            delete_screenshots: false,
+        });
+        assert!(matches!(
+            rx.recv_timeout(Duration::from_secs(2)).unwrap(),
+            Event::Warning(_)
+        ));
+        std::fs::write(
+            shots.join("2024-01-15[21-04]_10.00, 5.00, -20.00_0, 0, 0, 1_3.0 (0).png"),
+            b"png",
+        )
+        .unwrap();
+        match rx
+            .recv_timeout(Duration::from_secs(3))
+            .expect("pas d'évènement reçu")
+        {
             Event::Position(p) => assert_eq!((p.x, p.z), (10.0, -20.0)),
             other => panic!("évènement inattendu : {other:?}"),
         }
@@ -261,10 +293,17 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("2024.01.15_21-04-11_0.15.0.0 application.log");
         std::fs::write(&file, "du bruit\n").unwrap();
-        let (_h, rx) = collect(Config { screenshots_dir: tmp("shots2"), logs_dir: Some(logs), delete_screenshots: false });
+        let (_h, rx) = collect(Config {
+            screenshots_dir: tmp("shots2"),
+            logs_dir: Some(logs),
+            delete_screenshots: false,
+        });
         std::thread::sleep(Duration::from_millis(300));
         use std::io::Write;
-        let mut f = std::fs::OpenOptions::new().append(true).open(&file).unwrap();
+        let mut f = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&file)
+            .unwrap();
         writeln!(f, "{NET}").unwrap();
         f.flush().unwrap();
         let deadline = std::time::Instant::now() + Duration::from_secs(4);
@@ -272,7 +311,10 @@ mod tests {
             let left = deadline.saturating_duration_since(std::time::Instant::now());
             match rx.recv_timeout(left).expect("pas d'évènement de map reçu") {
                 Event::Map(m) => {
-                    assert_eq!((m.raw.as_str(), m.slug.as_deref()), ("Woods", Some("woods")));
+                    assert_eq!(
+                        (m.raw.as_str(), m.slug.as_deref()),
+                        ("Woods", Some("woods"))
+                    );
                     break;
                 }
                 _ => continue,
@@ -288,17 +330,32 @@ mod tests {
         let logs = tmp("logs-new");
         let old = logs.join("log_2024.01.15_20-00-00_0.15");
         std::fs::create_dir_all(&old).unwrap();
-        std::fs::write(old.join("2024.01.15_20-00-00_0.15 application.log"), "ancien\n").unwrap();
-        let (_h, rx) = collect(Config { screenshots_dir: tmp("shots-new"), logs_dir: Some(logs.clone()), delete_screenshots: false });
+        std::fs::write(
+            old.join("2024.01.15_20-00-00_0.15 application.log"),
+            "ancien\n",
+        )
+        .unwrap();
+        let (_h, rx) = collect(Config {
+            screenshots_dir: tmp("shots-new"),
+            logs_dir: Some(logs.clone()),
+            delete_screenshots: false,
+        });
         std::thread::sleep(Duration::from_millis(600));
         // Le jeu redémarre : nouvelle session, fichier déjà rempli au moment où on le voit.
         let newd = logs.join("log_2024.01.15_21-00-00_0.15");
         std::fs::create_dir_all(&newd).unwrap();
-        std::fs::write(newd.join("2024.01.15_21-00-00_0.15 application.log"), format!("{NET}\n")).unwrap();
+        std::fs::write(
+            newd.join("2024.01.15_21-00-00_0.15 application.log"),
+            format!("{NET}\n"),
+        )
+        .unwrap();
         let deadline = std::time::Instant::now() + Duration::from_secs(6);
         loop {
             let left = deadline.saturating_duration_since(std::time::Instant::now());
-            match rx.recv_timeout(left).expect("la nouvelle session n'a pas été détectée") {
+            match rx
+                .recv_timeout(left)
+                .expect("la nouvelle session n'a pas été détectée")
+            {
                 Event::Map(m) if m.slug.as_deref() == Some("woods") => break,
                 _ => continue,
             }
@@ -313,10 +370,17 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let file = dir.join("2024.01.15_21-04-11_0.15.0.0 notifications.log");
         std::fs::write(&file, "").unwrap();
-        let (_h, rx) = collect(Config { screenshots_dir: tmp("shots3"), logs_dir: Some(logs), delete_screenshots: false });
+        let (_h, rx) = collect(Config {
+            screenshots_dir: tmp("shots3"),
+            logs_dir: Some(logs),
+            delete_screenshots: false,
+        });
         std::thread::sleep(Duration::from_millis(300));
         use std::io::Write;
-        let mut f = std::fs::OpenOptions::new().append(true).open(&file).unwrap();
+        let mut f = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&file)
+            .unwrap();
         write!(f, "2024-01-15 21:05:00.000 +01:00|0.15|Info|push-notifications|Got notification | ChatMessageReceived\n{{\n  \"message\": {{\n").unwrap();
         f.flush().unwrap();
         std::thread::sleep(Duration::from_millis(100));
@@ -325,9 +389,15 @@ mod tests {
         let deadline = std::time::Instant::now() + Duration::from_secs(4);
         loop {
             let left = deadline.saturating_duration_since(std::time::Instant::now());
-            match rx.recv_timeout(left).expect("pas d'évènement de quête reçu") {
+            match rx
+                .recv_timeout(left)
+                .expect("pas d'évènement de quête reçu")
+            {
                 Event::Task(t) => {
-                    assert_eq!((t.id.as_str(), t.status), ("5936d90786f7742b1420ba5b", TaskStatus::Finished));
+                    assert_eq!(
+                        (t.id.as_str(), t.status),
+                        ("5936d90786f7742b1420ba5b", TaskStatus::Finished)
+                    );
                     break;
                 }
                 _ => continue,

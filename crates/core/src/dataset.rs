@@ -127,7 +127,10 @@ pub struct Envelope<D> {
 /// Table de traduction : clé -> texte.
 pub type Table = HashMap<String, String>;
 pub fn table_from(raw: HashMap<String, Lax>) -> Table {
-    raw.into_iter().map(|(k, v)| (k, v.0)).filter(|(_, v)| !v.is_empty()).collect()
+    raw.into_iter()
+        .map(|(k, v)| (k, v.0))
+        .filter(|(_, v)| !v.is_empty())
+        .collect()
 }
 fn tr(t: &Table, key: Option<&str>) -> Option<String> {
     t.get(key?).cloned()
@@ -308,7 +311,8 @@ fn s(v: &Value, k: &str) -> Option<String> {
     v.get(k).and_then(Value::as_str).map(str::to_string)
 }
 fn pos_json(p: &Option<Pos>) -> Value {
-    p.as_ref().map_or(Value::Null, |p| json!({ "x": p.x, "y": p.y, "z": p.z }))
+    p.as_ref()
+        .map_or(Value::Null, |p| json!({ "x": p.x, "y": p.y, "z": p.z }))
 }
 fn pos_value(v: Option<&Value>) -> Option<Value> {
     let o = v?.as_object()?;
@@ -354,7 +358,8 @@ fn category_names(doc: &ItemsDoc, t: &Table) -> HashMap<String, String> {
     let mut out = HashMap::new();
     for c in doc.item_categories.0.iter().chain(doc.categories.0.iter()) {
         if let Some(id) = id_of(c) {
-            let name = tr(t, c.get("name").and_then(Value::as_str)).or_else(|| s(c, "normalizedName").map(|n| pretty(&n)));
+            let name = tr(t, c.get("name").and_then(Value::as_str))
+                .or_else(|| s(c, "normalizedName").map(|n| pretty(&n)));
             if let Some(n) = name {
                 out.insert(id, n);
             }
@@ -375,9 +380,19 @@ pub fn convert_items(doc: &ItemsDoc, t: &Table, q: &mut Quality) -> ItemsOut {
         let short = tr(t, it.short_name.as_deref()).unwrap_or_else(|| name.clone());
         // Catégorie : référence (`category`), sinon première de `categories`, sinon rien.
         let cat = id_of(&it.category)
-            .or_else(|| it.categories.as_array().and_then(|a| a.first()).and_then(id_of))
+            .or_else(|| {
+                it.categories
+                    .as_array()
+                    .and_then(|a| a.first())
+                    .and_then(id_of)
+            })
             .and_then(|cid| cats.get(&cid).cloned())
-            .or_else(|| it.category.get("name").and_then(Value::as_str).and_then(|k| tr(t, Some(k))));
+            .or_else(|| {
+                it.category
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .and_then(|k| tr(t, Some(k)))
+            });
         if cat.is_some() {
             q.items_with_category += 1;
         }
@@ -399,7 +414,10 @@ pub fn convert_items(doc: &ItemsDoc, t: &Table, q: &mut Quality) -> ItemsOut {
         }));
     }
     q.items = out.len();
-    ItemsOut { items: Value::Array(out), names }
+    ItemsOut {
+        items: Value::Array(out),
+        names,
+    }
 }
 
 /* ---------- Hideout ---------- */
@@ -425,13 +443,29 @@ pub fn convert_hideout(data: &Value, t: &Table, q: &mut Quality) -> Value {
             .or_else(|| s(st, "normalizedName").map(|n| pretty(&n)))
             .unwrap_or_else(|| id.clone());
         let mut levels = Vec::new();
-        for lv in st.get("levels").and_then(Value::as_array).into_iter().flatten() {
+        for lv in st
+            .get("levels")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
             let level = lv.get("level").and_then(Value::as_i64).unwrap_or(1);
             let mut items = Vec::new();
-            for r in lv.get("itemRequirements").and_then(Value::as_array).into_iter().flatten() {
-                let Some(iid) = id_of(r.get("item").unwrap_or(&Value::Null)) else { continue };
+            for r in lv
+                .get("itemRequirements")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+            {
+                let Some(iid) = id_of(r.get("item").unwrap_or(&Value::Null)) else {
+                    continue;
+                };
                 let count = r.get("count").and_then(Value::as_i64).unwrap_or(1);
-                let fir = r.get("attributes").and_then(|a| a.get("foundInRaid")).and_then(Value::as_bool).unwrap_or(false);
+                let fir = r
+                    .get("attributes")
+                    .and_then(|a| a.get("foundInRaid"))
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
                 items.push(json!({ "id": iid, "count": count, "fir": fir }));
             }
             // Bonus débloqués à ce niveau (passifs et de production).
@@ -517,7 +551,10 @@ pub fn convert_traders(data: &Value, t: &Table) -> HashMap<String, Value> {
         let slug = s(tr_, "normalizedName").unwrap_or_else(|| id.clone());
         let name = tr(t, tr_.get("name").and_then(Value::as_str)).unwrap_or_else(|| pretty(&slug));
         let img = s(tr_, "imageLink").or_else(|| s(tr_, "image4xLink"));
-        out.insert(id.clone(), json!({ "id": id, "name": name, "normalizedName": slug, "imageLink": img }));
+        out.insert(
+            id.clone(),
+            json!({ "id": id, "name": name, "normalizedName": slug, "imageLink": img }),
+        );
     }
     out
 }
@@ -530,7 +567,13 @@ pub struct MapsOut {
     pub slugs: HashMap<String, String>,
 }
 
-pub fn convert_maps(doc: &MapsDoc, t: &Table, item_names: &HashMap<String, String>, container_nodes: &HashMap<String, String>, q: &mut Quality) -> MapsOut {
+pub fn convert_maps(
+    doc: &MapsDoc,
+    t: &Table,
+    item_names: &HashMap<String, String>,
+    container_nodes: &HashMap<String, String>,
+    q: &mut Quality,
+) -> MapsOut {
     let mut slugs = HashMap::new();
     for m in &doc.maps.0 {
         if let (Some(id), Some(n)) = (&m.id, &m.normalized_name) {
@@ -541,7 +584,13 @@ pub fn convert_maps(doc: &MapsDoc, t: &Table, item_names: &HashMap<String, Strin
         .bosses
         .0
         .iter()
-        .filter_map(|b| Some((id_of(b)?, tr(t, b.get("name").and_then(Value::as_str)).or_else(|| s(b, "normalizedName").map(|n| pretty(&n)))?)))
+        .filter_map(|b| {
+            Some((
+                id_of(b)?,
+                tr(t, b.get("name").and_then(Value::as_str))
+                    .or_else(|| s(b, "normalizedName").map(|n| pretty(&n)))?,
+            ))
+        })
         .collect();
 
     // Libellés officiels des conteneurs fournis par l'API : id → clé de traduction (« <id> Name »)
@@ -560,10 +609,14 @@ pub fn convert_maps(doc: &MapsDoc, t: &Table, item_names: &HashMap<String, Strin
 
     let mut maps = Vec::new();
     for m in &doc.maps.0 {
-        let Some(slug) = m.normalized_name.clone() else { continue };
+        let Some(slug) = m.normalized_name.clone() else {
+            continue;
+        };
         let container_name = |tpl: &Value| -> Option<(String, String)> {
             let id = id_of(tpl)?;
-            let name = container_label.get(&id).and_then(|k| t.get(k))
+            let name = container_label
+                .get(&id)
+                .and_then(|k| t.get(k))
                 .or_else(|| t.get(&format!("{id} Name")))
                 .or_else(|| t.get(&format!("{id} name")))
                 .or_else(|| item_names.get(&id))
@@ -574,12 +627,18 @@ pub fn convert_maps(doc: &MapsDoc, t: &Table, item_names: &HashMap<String, Strin
         };
         let mut containers = Vec::new();
         for c in &m.loot_containers {
-            let (Some(p), Some((id, name))) = (&c.position, container_name(&c.template)) else { continue };
+            let (Some(p), Some((id, name))) = (&c.position, container_name(&c.template)) else {
+                continue;
+            };
             q.containers += 1;
             if !name.is_empty() {
                 q.containers_named += 1;
             }
-            let shown = if name.is_empty() { format!("Conteneur ({})", id.get(..6).unwrap_or(&id)) } else { name };
+            let shown = if name.is_empty() {
+                format!("Conteneur ({})", id.get(..6).unwrap_or(&id))
+            } else {
+                name
+            };
             containers.push(json!({ "lootContainer": { "id": id, "name": shown, "normalizedName": id }, "position": p }));
         }
         let loose: Vec<Value> = m
@@ -587,7 +646,12 @@ pub fn convert_maps(doc: &MapsDoc, t: &Table, item_names: &HashMap<String, Strin
             .iter()
             .filter_map(|l| {
                 let p = l.position.as_ref()?;
-                let items: Vec<Value> = l.items.iter().filter_map(id_of).map(|id| json!({ "id": id })).collect();
+                let items: Vec<Value> = l
+                    .items
+                    .iter()
+                    .filter_map(id_of)
+                    .map(|id| json!({ "id": id }))
+                    .collect();
                 Some(json!({ "items": items, "position": p }))
             })
             .collect();
@@ -597,7 +661,11 @@ pub fn convert_maps(doc: &MapsDoc, t: &Table, item_names: &HashMap<String, Strin
             .iter()
             .filter(|e| e.position.is_some())
             .map(|e| {
-                let outline: Vec<Value> = e.outline.iter().map(|p| json!({ "x": p.x, "y": p.y, "z": p.z })).collect();
+                let outline: Vec<Value> = e
+                    .outline
+                    .iter()
+                    .map(|p| json!({ "x": p.x, "y": p.y, "z": p.z }))
+                    .collect();
                 json!({
                     "id": e.id,
                     "name": tr(t, e.name.as_deref()).or_else(|| e.name.clone()),
@@ -677,7 +745,10 @@ pub fn convert_maps(doc: &MapsDoc, t: &Table, item_names: &HashMap<String, Strin
         }));
     }
     q.maps = maps.len();
-    MapsOut { maps: Value::Array(maps), slugs }
+    MapsOut {
+        maps: Value::Array(maps),
+        slugs,
+    }
 }
 
 /* ---------- Quêtes ---------- */
@@ -698,7 +769,14 @@ fn type_label(t: &str) -> &'static str {
     }
 }
 
-pub fn convert_tasks(raw: &[Value], slugs: &HashMap<String, String>, traders: &HashMap<String, Value>, t: &Table, q: &mut Quality, removed: &HashSet<String>) -> Value {
+pub fn convert_tasks(
+    raw: &[Value],
+    slugs: &HashMap<String, String>,
+    traders: &HashMap<String, Value>,
+    t: &Table,
+    q: &mut Quality,
+    removed: &HashSet<String>,
+) -> Value {
     let slug_of = |v: &Value| id_of(v).and_then(|id| slugs.get(&id).cloned());
     let norm = |slug: String| json!({ "normalizedName": slug });
     let mut out = Vec::new();
@@ -707,21 +785,41 @@ pub fn convert_tasks(raw: &[Value], slugs: &HashMap<String, String>, traders: &H
         // Quête retirée du jeu : sa page wiki est classée « Historical content ».
         if let Some(link) = task.get("wikiLink").and_then(Value::as_str) {
             if let Some(title) = crate::wiki::page_title(link) {
-                if removed.contains(&title) { continue }
+                if removed.contains(&title) {
+                    continue;
+                }
             }
         }
         let normalized = s(task, "normalizedName");
-        let name = tr(t, task.get("name").and_then(Value::as_str)).or_else(|| normalized.clone().map(|n| pretty(&n))).unwrap_or_else(|| id.clone());
-        let trader = task.get("trader").and_then(id_of).and_then(|tid| traders.get(&tid).cloned());
+        let name = tr(t, task.get("name").and_then(Value::as_str))
+            .or_else(|| normalized.clone().map(|n| pretty(&n)))
+            .unwrap_or_else(|| id.clone());
+        let trader = task
+            .get("trader")
+            .and_then(id_of)
+            .and_then(|tid| traders.get(&tid).cloned());
         if trader.is_some() {
             q.tasks_with_trader += 1;
         }
         let mut objectives = Vec::new();
-        for o in task.get("objectives").and_then(Value::as_array).into_iter().flatten() {
+        for o in task
+            .get("objectives")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
             let Some(oid) = s(o, "id") else { continue };
             let typ = s(o, "type").unwrap_or_default();
-            let description = tr(t, o.get("description").and_then(Value::as_str)).unwrap_or_else(|| type_label(&typ).to_string());
-            let maps: Vec<Value> = o.get("maps").and_then(Value::as_array).into_iter().flatten().filter_map(|m| slug_of(m)).map(norm).collect();
+            let description = tr(t, o.get("description").and_then(Value::as_str))
+                .unwrap_or_else(|| type_label(&typ).to_string());
+            let maps: Vec<Value> = o
+                .get("maps")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|m| slug_of(m))
+                .map(norm)
+                .collect();
             let zones: Vec<Value> = o
                 .get("zones")
                 .and_then(Value::as_array)
@@ -736,7 +834,15 @@ pub fn convert_tasks(raw: &[Value], slugs: &HashMap<String, String>, traders: &H
             if !zones.is_empty() {
                 q.objectives_with_zone += 1;
             }
-            let refs = |k: &str| -> Vec<Value> { o.get(k).and_then(Value::as_array).into_iter().flatten().filter_map(id_of).map(|i| json!({ "id": i })).collect() };
+            let refs = |k: &str| -> Vec<Value> {
+                o.get(k)
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(id_of)
+                    .map(|i| json!({ "id": i }))
+                    .collect()
+            };
             let locations: Vec<Value> = o
                 .get("possibleLocations")
                 .and_then(Value::as_array)
@@ -744,7 +850,13 @@ pub fn convert_tasks(raw: &[Value], slugs: &HashMap<String, String>, traders: &H
                 .flatten()
                 .filter_map(|l| {
                     let slug = l.get("map").and_then(|m| slug_of(m))?;
-                    let pts: Vec<Value> = l.get("positions").and_then(Value::as_array).into_iter().flatten().filter_map(|p| pos_value(Some(p))).collect();
+                    let pts: Vec<Value> = l
+                        .get("positions")
+                        .and_then(Value::as_array)
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|p| pos_value(Some(p)))
+                        .collect();
                     Some(json!({ "map": norm(slug), "positions": pts }))
                 })
                 .collect();
@@ -782,7 +894,15 @@ pub fn convert_tasks(raw: &[Value], slugs: &HashMap<String, String>, traders: &H
 }
 
 /// Assemble le jeu de données complet tel que l'interface le lit.
-pub fn assemble(tasks: Value, maps: Value, items: Value, hideout: Value, lang: &str, fetched_at: u64, q: &Quality) -> Value {
+pub fn assemble(
+    tasks: Value,
+    maps: Value,
+    items: Value,
+    hideout: Value,
+    lang: &str,
+    fetched_at: u64,
+    q: &Quality,
+) -> Value {
     let mut o = Map::new();
     o.insert("version".into(), json!(2));
     o.insert("source".into(), json!("json.tarkov.dev"));
@@ -792,7 +912,10 @@ pub fn assemble(tasks: Value, maps: Value, items: Value, hideout: Value, lang: &
     o.insert("maps".into(), maps);
     o.insert("items".into(), items);
     o.insert("hideout".into(), hideout);
-    o.insert("quality".into(), serde_json::to_value(q).unwrap_or(Value::Null));
+    o.insert(
+        "quality".into(),
+        serde_json::to_value(q).unwrap_or(Value::Null),
+    );
     Value::Object(o)
 }
 
@@ -801,20 +924,35 @@ mod tests {
     use super::*;
 
     fn table(pairs: &[(&str, &str)]) -> Table {
-        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect()
     }
 
     #[test]
     fn liste_ou_objet_indexe() {
-        let a: Envelope<TasksDoc> = serde_json::from_str(r#"{"data":{"tasks":[{"id":"a"},{"id":"b"}]}}"#).unwrap();
-        let b: Envelope<TasksDoc> = serde_json::from_str(r#"{"data":{"tasks":{"a":{"id":"a"},"b":{"id":"b"}}}}"#).unwrap();
+        let a: Envelope<TasksDoc> =
+            serde_json::from_str(r#"{"data":{"tasks":[{"id":"a"},{"id":"b"}]}}"#).unwrap();
+        let b: Envelope<TasksDoc> =
+            serde_json::from_str(r#"{"data":{"tasks":{"a":{"id":"a"},"b":{"id":"b"}}}}"#).unwrap();
         let c: Envelope<TasksDoc> = serde_json::from_str(r#"{"data":{"tasks":null}}"#).unwrap();
-        assert_eq!((a.data.tasks.0.len(), b.data.tasks.0.len(), c.data.tasks.0.len()), (2, 2, 0));
+        assert_eq!(
+            (
+                a.data.tasks.0.len(),
+                b.data.tasks.0.len(),
+                c.data.tasks.0.len()
+            ),
+            (2, 2, 0)
+        );
     }
 
     #[test]
     fn traduction_tolerante() {
-        let t: Envelope<HashMap<String, Lax>> = serde_json::from_str(r#"{"data":{"k1 name":"Bouteille","n":12,"nul":null,"o":{"x":1}}}"#).unwrap();
+        let t: Envelope<HashMap<String, Lax>> = serde_json::from_str(
+            r#"{"data":{"k1 name":"Bouteille","n":12,"nul":null,"o":{"x":1}}}"#,
+        )
+        .unwrap();
         let t = table_from(t.data);
         assert_eq!(t.get("k1 name").map(String::as_str), Some("Bouteille"));
         assert_eq!(t.get("n").map(String::as_str), Some("12"));
@@ -842,58 +980,129 @@ mod tests {
         )
         .unwrap();
         let tasks = serde_json::json!({"tasks":{"t1":{
-            "id":"t1","name":"t1 name","normalizedName":"debut","trader":"tr1","map":"m1","minPlayerLevel":1,"kappaRequired":true,
-            "taskRequirements":[{"task":"t0","status":["complete"]},{"task":{"id":"t9"},"status":null}],
-            "objectives":[
-              {"id":"o1","type":"visit","description":"o1 description","zones":[{"map":"m1","position":{"x":1,"y":2,"z":3},"outline":[{"x":0,"y":0,"z":0},{"x":1,"y":0,"z":0},{"x":1,"y":0,"z":1}],"top":9,"bottom":-1}],"maps":["m1"]},
-              {"id":"o2","type":"findItem","description":"zzz sans traduction","items":["i1",{"id":"i2"}],"count":3,"foundInRaid":true,"maps":["m1","m2"]},
-              {"id":"o3","type":"findQuestItem","possibleLocations":[{"map":"m2","positions":[{"x":10,"y":0,"z":11}]}],"maps":[]},
-              {"type":"visit"}
-            ]}}});
+        "id":"t1","name":"t1 name","normalizedName":"debut","trader":"tr1","map":"m1","minPlayerLevel":1,"kappaRequired":true,
+        "taskRequirements":[{"task":"t0","status":["complete"]},{"task":{"id":"t9"},"status":null}],
+        "objectives":[
+          {"id":"o1","type":"visit","description":"o1 description","zones":[{"map":"m1","position":{"x":1,"y":2,"z":3},"outline":[{"x":0,"y":0,"z":0},{"x":1,"y":0,"z":0},{"x":1,"y":0,"z":1}],"top":9,"bottom":-1}],"maps":["m1"]},
+          {"id":"o2","type":"findItem","description":"zzz sans traduction","items":["i1",{"id":"i2"}],"count":3,"foundInRaid":true,"maps":["m1","m2"]},
+          {"id":"o3","type":"findQuestItem","possibleLocations":[{"map":"m2","positions":[{"x":10,"y":0,"z":11}]}],"maps":[]},
+          {"type":"visit"}
+        ]}}});
         let traders = serde_json::json!({"data":{"traders":[{"id":"tr1","name":"tr1 name","normalizedName":"prapor","imageLink":"https://x/prapor.webp"}]}});
-        (items.data, maps.data, TasksDoc::deserialize(tasks).unwrap().tasks.0, traders["data"].clone())
+        (
+            items.data,
+            maps.data,
+            TasksDoc::deserialize(tasks).unwrap().tasks.0,
+            traders["data"].clone(),
+        )
     }
 
     #[test]
     fn conversion_complete() {
         let (items, maps, tasks, traders_doc) = sample();
         let t = table(&[
-            ("i1 name", "Bouteille d'eau"), ("i1 shortName", "Eau"), ("c1 name", "Nourriture"), ("i2 name", "Boîte à armes"),
-            ("m1 name", "Customs"), ("e1 name", "ZB-1011"), ("t1 desc", "Vers Woods"), ("b1 name", "Reshala"), ("loc1 name", "Dortoirs"),
-            ("t1 name", "Début du tournage"), ("o1 description", "Visitez la station"), ("tr1 name", "Prapor"),
+            ("i1 name", "Bouteille d'eau"),
+            ("i1 shortName", "Eau"),
+            ("c1 name", "Nourriture"),
+            ("i2 name", "Boîte à armes"),
+            ("m1 name", "Customs"),
+            ("e1 name", "ZB-1011"),
+            ("t1 desc", "Vers Woods"),
+            ("b1 name", "Reshala"),
+            ("loc1 name", "Dortoirs"),
+            ("t1 name", "Début du tournage"),
+            ("o1 description", "Visitez la station"),
+            ("tr1 name", "Prapor"),
         ]);
         let mut q = Quality::default();
         let it = convert_items(&items, &t, &mut q);
-        let i1 = it.items.as_array().unwrap().iter().find(|i| i["id"] == "i1").unwrap();
+        let i1 = it
+            .items
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|i| i["id"] == "i1")
+            .unwrap();
         assert_eq!(i1["name"], "Bouteille d'eau");
         assert_eq!(i1["shortName"], "Eau");
         assert_eq!(i1["category"]["name"], "Nourriture");
-        assert_eq!(i1["avg24hPrice"], 4200.0, "avg24h absent => repli sur lastLow");
+        assert_eq!(
+            i1["avg24hPrice"], 4200.0,
+            "avg24h absent => repli sur lastLow"
+        );
         assert_eq!(i1["sellFor"][0]["source"], "prapor");
-        assert_eq!(i1["sellFor"][1]["price"], 4500.0, "prix de vente par marchand conservés");
-        let i2 = it.items.as_array().unwrap().iter().find(|i| i["id"] == "i2").unwrap();
-        assert_eq!(i2["types"], serde_json::json!([]), "types nul => liste vide");
-        assert!(i2["category"].is_null(), "catégorie inconnue => aucune (pas de plantage)");
-        assert_eq!(i2["sellFor"], serde_json::json!([]), "pas de prix de vente => liste vide");
+        assert_eq!(
+            i1["sellFor"][1]["price"], 4500.0,
+            "prix de vente par marchand conservés"
+        );
+        let i2 = it
+            .items
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|i| i["id"] == "i2")
+            .unwrap();
+        assert_eq!(
+            i2["types"],
+            serde_json::json!([]),
+            "types nul => liste vide"
+        );
+        assert!(
+            i2["category"].is_null(),
+            "catégorie inconnue => aucune (pas de plantage)"
+        );
+        assert_eq!(
+            i2["sellFor"],
+            serde_json::json!([]),
+            "pas de prix de vente => liste vide"
+        );
 
         let m = convert_maps(&maps, &t, &it.names, &HashMap::new(), &mut q);
         assert_eq!(m.slugs.get("m2").map(String::as_str), Some("woods"));
         let c = &m.maps[0];
         assert_eq!(c["name"], "Customs");
         assert_eq!(c["extracts"][0]["name"], "ZB-1011");
-        assert_eq!(c["extracts"][0]["switches"], serde_json::json!(["s1"]), "interrupteurs conservés");
-        assert_eq!(c["extracts"][0]["outline"].as_array().unwrap().len(), 3, "contour d'extraction conservé");
-        assert_eq!(c["spawns"].as_array().unwrap().len(), 1, "spawn sans position ignoré");
+        assert_eq!(
+            c["extracts"][0]["switches"],
+            serde_json::json!(["s1"]),
+            "interrupteurs conservés"
+        );
+        assert_eq!(
+            c["extracts"][0]["outline"].as_array().unwrap().len(),
+            3,
+            "contour d'extraction conservé"
+        );
+        assert_eq!(
+            c["spawns"].as_array().unwrap().len(),
+            1,
+            "spawn sans position ignoré"
+        );
         assert_eq!(c["transits"][0]["description"], "Vers Woods");
         let loose = c["lootLoose"].as_array().unwrap();
         assert_eq!(loose.len(), 1);
-        assert_eq!(loose[0]["items"].as_array().unwrap().len(), 3, "objets en chaîne ou en objet");
+        assert_eq!(
+            loose[0]["items"].as_array().unwrap().len(),
+            3,
+            "objets en chaîne ou en objet"
+        );
         let cont = c["lootContainers"].as_array().unwrap();
-        assert_eq!(cont[0]["lootContainer"]["name"], "Boîte à armes", "nom retrouvé via la table des objets");
-        assert!(cont[1]["lootContainer"]["name"].as_str().unwrap().starts_with("Conteneur (zzzzzz)"), "nom inconnu => libellé de repli, regroupement conservé");
+        assert_eq!(
+            cont[0]["lootContainer"]["name"], "Boîte à armes",
+            "nom retrouvé via la table des objets"
+        );
+        assert!(
+            cont[1]["lootContainer"]["name"]
+                .as_str()
+                .unwrap()
+                .starts_with("Conteneur (zzzzzz)"),
+            "nom inconnu => libellé de repli, regroupement conservé"
+        );
         assert_eq!(c["bosses"][0]["boss"]["name"], "Reshala");
         assert_eq!(c["bosses"][0]["spawnLocations"][0]["name"], "Dortoirs");
-        assert_eq!(c["stationaryWeapons"][0]["stationaryWeapon"]["name"], "Bouteille d'eau");
+        assert_eq!(
+            c["stationaryWeapons"][0]["stationaryWeapon"]["name"],
+            "Bouteille d'eau"
+        );
         assert_eq!((q.containers, q.containers_named), (2, 1));
 
         let traders = convert_traders(&traders_doc, &t);
@@ -910,12 +1119,26 @@ mod tests {
         assert_eq!(objs[0]["description"], "Visitez la station");
         assert_eq!(objs[0]["zones"][0]["map"]["normalizedName"], "customs");
         assert_eq!(objs[0]["zones"][0]["outline"].as_array().unwrap().len(), 3);
-        assert_eq!(objs[1]["description"], "Trouver l'objet", "pas de traduction => libellé du type");
+        assert_eq!(
+            objs[1]["description"], "Trouver l'objet",
+            "pas de traduction => libellé du type"
+        );
         assert_eq!(objs[1]["items"][1]["id"], "i2");
         assert_eq!(objs[1]["maps"].as_array().unwrap().len(), 2);
         assert_eq!(objs[1]["count"], 3.0);
-        assert_eq!(objs[2]["possibleLocations"][0]["map"]["normalizedName"], "woods");
-        assert_eq!((q.tasks, q.tasks_with_trader, q.objectives, q.objectives_with_zone), (1, 1, 3, 1));
+        assert_eq!(
+            objs[2]["possibleLocations"][0]["map"]["normalizedName"],
+            "woods"
+        );
+        assert_eq!(
+            (
+                q.tasks,
+                q.tasks_with_trader,
+                q.objectives,
+                q.objectives_with_zone
+            ),
+            (1, 1, 3, 1)
+        );
     }
 
     #[test]
@@ -934,17 +1157,37 @@ mod tests {
             {"id":"ok","name":"ok name","normalizedName":"ok","wikiLink":"https://escapefromtarkov.fandom.com/wiki/Glory_to_CPSU","objectives":[]},
             {"id":"old","name":"old name","normalizedName":"old","wikiLink":"https://escapefromtarkov.fandom.com/wiki/Glory_to_CPSU_-_Part_1","objectives":[]}
         ]);
-        let t = table(&[("ok name", "Glory to CPSU"), ("old name", "Gloire au PCUS - Partie 1")]);
+        let t = table(&[
+            ("ok name", "Glory to CPSU"),
+            ("old name", "Gloire au PCUS - Partie 1"),
+        ]);
         let mut q = Quality::default();
         let mut removed = HashSet::new();
         removed.insert("Glory to CPSU - Part 1".to_string());
-        let out = convert_tasks(raw.as_array().unwrap(), &HashMap::new(), &HashMap::new(), &t, &mut q, &removed);
-        let names: Vec<&str> = out.as_array().unwrap().iter().filter_map(|v| v["name"].as_str()).collect();
-        assert_eq!(names, vec!["Glory to CPSU"], "la quête historique est filtrée, la valide reste");
+        let out = convert_tasks(
+            raw.as_array().unwrap(),
+            &HashMap::new(),
+            &HashMap::new(),
+            &t,
+            &mut q,
+            &removed,
+        );
+        let names: Vec<&str> = out
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|v| v["name"].as_str())
+            .collect();
+        assert_eq!(
+            names,
+            vec!["Glory to CPSU"],
+            "la quête historique est filtrée, la valide reste"
+        );
     }
 
     #[test]
-    fn le_format_produit_est_celui_lu_par_l_interface() {        let (items, maps, tasks, traders_doc) = sample();
+    fn le_format_produit_est_celui_lu_par_l_interface() {
+        let (items, maps, tasks, traders_doc) = sample();
         let t = table(&[]);
         let mut q = Quality::default();
         let it = convert_items(&items, &t, &mut q);
@@ -953,7 +1196,10 @@ mod tests {
         let ts = convert_tasks(&tasks, &m.slugs, &tr_, &t, &mut q, &HashSet::new());
         let ho = convert_hideout(&hideout_doc(), &t, &mut q);
         let all = assemble(ts, m.maps, it.items, ho, "fr", 123, &q);
-        assert_eq!((all["version"].clone(), all["source"].clone()), (serde_json::json!(2), serde_json::json!("json.tarkov.dev")));
+        assert_eq!(
+            (all["version"].clone(), all["source"].clone()),
+            (serde_json::json!(2), serde_json::json!("json.tarkov.dev"))
+        );
         assert_eq!(all["quality"]["tasks"], 1);
         // sans aucune traduction, rien ne plante et les noms retombent sur les identifiants lisibles
         assert_eq!(all["tasks"][0]["name"], "Debut");
@@ -981,14 +1227,25 @@ mod tests {
         let mut q = Quality::default();
         let h = convert_hideout(&hideout_doc(), &t, &mut q);
         let arr = h.as_array().unwrap();
-        assert_eq!(arr.len(), 1, "les stations sans objet à réunir sont ignorées");
+        assert_eq!(
+            arr.len(),
+            1,
+            "les stations sans objet à réunir sont ignorées"
+        );
         assert_eq!(arr[0]["name"], "Coffre");
-        assert_eq!(arr[0]["levels"].as_array().unwrap().len(), 1, "niveaux vides ignorés");
+        assert_eq!(
+            arr[0]["levels"].as_array().unwrap().len(),
+            1,
+            "niveaux vides ignorés"
+        );
         let lv = &arr[0]["levels"][0];
         assert_eq!(lv["level"], 2);
         assert_eq!(lv["items"][0]["count"], 3);
         assert_eq!(lv["items"][0]["fir"], true);
-        assert_eq!(lv["items"][1]["id"], "i2", "référence objet sous forme d'objet");
+        assert_eq!(
+            lv["items"][1]["id"], "i2",
+            "référence objet sous forme d'objet"
+        );
         assert_eq!((q.hideout_stations, q.hideout_items), (1, 2));
     }
 
@@ -1010,12 +1267,21 @@ mod tests {
         let t = table_from(HashMap::new());
         let mut q = Quality::default();
         let mut nodes = HashMap::new();
-        nodes.insert("5909d50c86f774659e6aaebe".to_string(), "Technical supply crate".to_string());
-        nodes.insert("578f87ad245977356274f2cc".to_string(), "Sports bag".to_string());
+        nodes.insert(
+            "5909d50c86f774659e6aaebe".to_string(),
+            "Technical supply crate".to_string(),
+        );
+        nodes.insert(
+            "578f87ad245977356274f2cc".to_string(),
+            "Sports bag".to_string(),
+        );
         let m = convert_maps(&doc, &t, &HashMap::new(), &nodes, &mut q);
         let map = &m.maps[0];
         let containers = map["lootContainers"].as_array().unwrap();
-        assert_eq!(containers[0]["lootContainer"]["name"], "Technical supply crate");
+        assert_eq!(
+            containers[0]["lootContainer"]["name"],
+            "Technical supply crate"
+        );
         assert_eq!(containers[1]["lootContainer"]["name"], "Sports bag");
         assert_eq!(q.containers_named, 2);
     }
@@ -1048,9 +1314,15 @@ mod tests {
         let mut q = Quality::default();
         let m = convert_maps(&doc, &t, &HashMap::new(), &HashMap::new(), &mut q);
         let containers = m.maps[0]["lootContainers"].as_array().unwrap();
-        assert_eq!(containers[0]["lootContainer"]["name"], "Sac de sport", "nom résolu via le référentiel de l'API");
+        assert_eq!(
+            containers[0]["lootContainer"]["name"], "Sac de sport",
+            "nom résolu via le référentiel de l'API"
+        );
         assert_eq!(containers[1]["lootContainer"]["name"], "Caisse technique");
-        assert_eq!(containers[2]["lootContainer"]["name"], "Weapon crate", "sans traduction => libellé anglais de repli");
+        assert_eq!(
+            containers[2]["lootContainer"]["name"], "Weapon crate",
+            "sans traduction => libellé anglais de repli"
+        );
         assert_eq!(q.containers_named, 3);
     }
 
@@ -1094,7 +1366,13 @@ mod tests {
             "lootContainers": [], "lootLoose": [], "stationaryWeapons": [], "bosses": [] } ] }"#;
         let doc: MapsDoc = serde_json::from_str(json).unwrap();
         let mut q = Quality::default();
-        let m = convert_maps(&doc, &table_from(HashMap::new()), &HashMap::new(), &HashMap::new(), &mut q);
+        let m = convert_maps(
+            &doc,
+            &table_from(HashMap::new()),
+            &HashMap::new(),
+            &HashMap::new(),
+            &mut q,
+        );
         assert_eq!(m.maps[0]["locks"].as_array().unwrap().len(), 0);
         assert_eq!(q.locks, 0);
     }

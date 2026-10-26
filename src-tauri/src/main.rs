@@ -997,6 +997,22 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        // Une seule instance de l'app : un second lancement (double-clic
+        // pendant l'auto-démarrage, lanceur + portable, relance de l'uploader)
+        // quittait vite mais laissait tourner DEUX overlays — la « double
+        // fenêtre ». Ici, le second process se termine aussitôt si un premier
+        // tourne déjà, et c'est PREMIER qui remet sa fenêtre au premier plan.
+        .plugin({
+            tauri_plugin_single_instance::init(|app, _args, _cwd| {
+                println!("[app] second launch detected -> focusing the running instance");
+                use tauri::Manager;
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.unminimize();
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                }
+            })
+        })
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {

@@ -14,82 +14,145 @@
       font-family: "Chakra Petch", "Bahnschrift", "Segoe UI", system-ui, sans-serif;
       user-select: none;
     }
-    body {
-      pointer-events: none;
-      display: block;
-    }
-    .hidden { display: none !important; }
-    /* L'attribut hidden est écrasé par .o-row { display:flex } (règle d'auteur
-       > feuille du navigateur) : sans ceci, les lignes/sections restent
-       affichées même quand le JS les masque. */
-    [hidden] { display: none !important; }
+/* L'ATTRIBUT data-theme sur <html> suit le thème choisi dans l'app
+   (localStorage["theme"], Partagé par les webviews de même origine) :
+   dark (défaut), light, cyberpunk. Les variables reflètent ui/style.css. */
+:root, [data-theme="dark"] {
+  --card-rgb: 10, 15, 11;      /* --bg */
+  --panel-soft: rgba(0, 0, 0, 0.27);
+  --ink: #eae8d9;
+  --text: #c3c3bf;
+  --dim: #8b8a80;
+  --field: #2c2c29;
+  --line: #2a2a25;
+  --line-hi: #6b6a60;
+  --cream: #f1edc8;
+  --cream-d: #d6d1a4;
+  --orange: #cc8245;
+  --lime: #86dc35;
+  --amber: #e2b24a;
+  --red: #c9573f;
+  --name-font: "Chakra Petch", sans-serif;
+}
+[data-theme="light"] {
+  --card-rgb: 233, 237, 226;   /* fond papier sauge */
+  --panel-soft: rgba(0, 0, 0, 0.06);
+  --ink: #23261c;
+  --text: #3c4034;
+  --dim: #75796a;
+  --field: #f7f9f3;
+  --line: #c4c9b8;
+  --line-hi: #a8ad9a;
+  --cream: #4a6b2a;
+  --cream-d: #3a5522;
+  --orange: #b06a2c;
+  --lime: #5a8c1f;
+  --amber: #8f6a1d;
+  --red: #a03a24;
+  --name-font: "Chakra Petch", sans-serif;
+}
+[data-theme="cyberpunk"] {
+  --card-rgb: 4, 4, 21;
+  --panel-soft: rgba(0, 0, 0, 0.35);
+  --ink: #f0f0ff;
+  --text: #c2b2ff;
+  --dim: #7a7ac4;
+  --field: #1a1a2e;
+  --line: #1a1a2e;
+  --line-hi: #5a5a8e;
+  --cream: #ffe6f0;
+  --cream-d: #ffcae0;
+  --orange: #ff9a8b;
+  --lime: #00ffcc;
+  --amber: #fff08a;
+  --red: #ff4a75;
+  --name-font: "Orbitron", "Chakra Petch", sans-serif;
+}
 
-    /* Palette Tarkov : fond charbon translucide (opacité configurable via
-       --bg-a), liseré doré discret, texte plein. L'ÉCHELLE DU TEXTE est
-       pilotée par --k (0.7 → 2.0) : chaque taille en dérive par calc(). */
-    .cursor-overlay {
-      position: relative;
-      width: 320px;
-      box-sizing: border-box;
-      --bg-a: 0.95;
-      --k: 1;
-      background: rgba(26, 21, 24, var(--bg-a));
-      border: 2px solid #8a7b52;
-      border-radius: 6px;
-      color: #ffffff;
-      font-size: calc(13px * var(--k));
-      line-height: 1.35;
-      overflow: hidden;
-      display: block;
-    }
-    .o-header {
-      display: flex; align-items: center; gap: 8px;
-      padding: calc(7px * var(--k)) calc(10px * var(--k)) calc(6px * var(--k));
-      border-bottom: 1px solid #55554c;
-      background: rgba(0, 0, 0, calc(var(--bg-a) * 0.27));
-    }
-    .o-icon {
-      width: calc(26px * var(--k)); height: calc(26px * var(--k)); flex-shrink: 0;
-      background: #55554c; border-radius: 3px;
-      background-size: contain; background-repeat: no-repeat; background-position: center;
-      border: 1px solid #55554c;
-    }
-    .o-name {
-      font-size: calc(13px * var(--k)); font-weight: 600; color: #ffffff;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      max-width: 246px; line-height: 1.2; margin: 0;
-    }
-    .o-name.placeholder { color: #a8a397; font-weight: 400; }
-    .o-sub { font-size: calc(10px * var(--k)); color: #a8a397; }
-    .o-body { padding: calc(5px * var(--k)) calc(10px * var(--k)) calc(7px * var(--k)); }
-    .o-sec { border-top: 1px solid #3a3832; padding: calc(2px * var(--k)) 0; }
-    .o-sec:first-child { border-top: none; }
-    .o-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: calc(2px * var(--k)) 0; }
-    .o-label { color: #a8a397; font-size: calc(11px * var(--k)); white-space: nowrap; flex-shrink: 0; }
-    .o-value {
-      font-weight: 600; color: #ffd700; font-size: calc(12px * var(--k));
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .o-value.dim { color: #cfc9bd; font-weight: 400; }
-    .o-dim {
-      color: #a8a397; font-size: calc(10px * var(--k));
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: calc(1px * var(--k)) 0;
-    }
-    .up { color: #8ec07c; }
-    .down { color: #d9534f; }
-    .o-list { padding: calc(1px * var(--k)) 0; }
-    .o-line {
-      font-size: calc(11px * var(--k)); color: #e6e0d4;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      padding: calc(1.5px * var(--k)) 0;
-    }
-    .o-line .lq { color: #ffd700; font-weight: 600; }
-    .o-line .done { color: #8a8578; text-decoration: line-through; }
-    .o-line .failed { color: #d9534f; text-decoration: line-through; }
-    .o-flag { color: #e06c75; }
-    .o-kappa { color: #ffd700; font-weight: 700; }
-    .o-bad { color: #ffb464; }
-    .o-more { color: #a8a397; font-size: calc(10px * var(--k)); }
+@font-face { font-family: "Chakra Petch"; font-weight: 400; src: url("fonts/ChakraPetch-Regular.ttf") format("truetype"); }
+@font-face { font-family: "Chakra Petch"; font-weight: 500; src: url("fonts/ChakraPetch-Medium.ttf") format("truetype"); }
+@font-face { font-family: "Chakra Petch"; font-weight: 600; src: url("fonts/ChakraPetch-SemiBold.ttf") format("truetype"); }
+@font-face { font-family: "Orbitron"; font-weight: 400; src: url("fonts/Orbitron-Regular.ttf") format("truetype"); }
+* { box-sizing: border-box; }
+
+body {
+  pointer-events: none;
+  display: block;
+  margin: 0;
+  font-family: "Chakra Petch", "Segoe UI", sans-serif;
+}
+.hidden { display: none !important; }
+/* L'attribut hidden est écrasé par .o-row { display:flex } (règle d'auteur
+   > feuille du navigateur) : sans ceci, les lignes/sections restent
+   affichées même quand le JS les masque. */
+[hidden] { display: none !important; }
+
+/* Palette du thème courant : fond charbon (opacité configurable via
+   --bg-a), texte/liseré issus des variables au-dessus. L'ÉCHELLE DU TEXTE
+   est pilotée par --k (0.7 → 2.0) : chaque taille en dérive par calc(). */
+.cursor-overlay {
+  position: relative;
+  width: 320px;
+  --bg-a: 0.95;
+  --k: 1;
+  background: rgba(var(--card-rgb), var(--bg-a));
+  border: 1px solid var(--line-hi);
+  border-radius: 6px;
+  color: var(--ink);
+  font-size: calc(13px * var(--k));
+  line-height: 1.35;
+  overflow: hidden;
+  display: block;
+}
+.o-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: calc(7px * var(--k)) calc(10px * var(--k)) calc(6px * var(--k));
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-soft);
+}
+.o-icon {
+  width: calc(26px * var(--k)); height: calc(26px * var(--k)); flex-shrink: 0;
+  background: var(--field); border-radius: 3px;
+  background-size: contain; background-repeat: no-repeat; background-position: center;
+  border: 1px solid var(--line);
+}
+.o-name {
+  font-size: calc(13px * var(--k)); font-weight: 600; color: var(--ink);
+  font-family: var(--name-font);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 250px; line-height: 1.2; margin: 0;
+}
+.o-name.placeholder { color: var(--dim); font-weight: 400; }
+.o-sub { font-size: calc(10px * var(--k)); color: var(--dim); }
+.o-body { padding: calc(5px * var(--k)) calc(10px * var(--k)) calc(7px * var(--k)); }
+.o-sec { border-top: 1px solid var(--line); padding: calc(2px * var(--k)) 0; }
+.o-sec:first-child { border-top: none; }
+.o-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: calc(2px * var(--k)) 0; }
+.o-label { color: var(--dim); font-size: calc(11px * var(--k)); white-space: nowrap; flex-shrink: 0; }
+.o-value {
+  font-weight: 600; color: var(--cream); font-size: calc(12px * var(--k));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.o-value.dim { color: var(--text); font-weight: 400; }
+.o-dim {
+  color: var(--dim); font-size: calc(10px * var(--k));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: calc(1px * var(--k)) 0;
+}
+.up { color: var(--lime); }
+.down { color: var(--red); }
+.o-list { padding: calc(1px * var(--k)) 0; }
+.o-line {
+  font-size: calc(11px * var(--k)); color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  padding: calc(1.5px * var(--k)) 0;
+}
+.o-line .lq { color: var(--cream); font-weight: 600; }
+.o-line .done { color: var(--dim); text-decoration: line-through; }
+.o-line .failed { color: var(--red); text-decoration: line-through; }
+.o-flag { color: var(--cream-d); }
+.o-kappa { color: var(--cream); font-weight: 700; }
+.o-bad { color: var(--orange); }
+.o-more { color: var(--dim); font-size: calc(10px * var(--k)); }
   </style>
 </head>
 <body>
@@ -485,6 +548,19 @@
       }
     } catch (e) {}
   }
+
+  /** La carte suit le thème de l'app : localStorage["theme"] est partagé par
+      les webviews de même origine ; l'événement « storage » arrive quand
+      l'utilisateur change de thème dans la fenêtre principale. */
+  function applyOverlayTheme() {
+    let t = null;
+    try { t = localStorage.getItem("theme"); } catch {}
+    document.documentElement.dataset.theme = (t === "light" || t === "cyberpunk") ? t : "dark";
+  }
+  window.addEventListener("storage", (e) => {
+    if (!e.key || e.key === "theme") applyOverlayTheme();
+  });
+  applyOverlayTheme();
 
   setInterval(poll, 200);
   // Au chargement, la carte est masquée par défaut : on cache aussi la fenêtre

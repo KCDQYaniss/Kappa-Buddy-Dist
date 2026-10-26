@@ -21,7 +21,9 @@ pub fn logs_under(install: &Path) -> [PathBuf; 2] {
 pub fn parse_library_paths(vdf: &str) -> Vec<PathBuf> {
     let mut out = Vec::new();
     for line in vdf.lines() {
-        let Some(rest) = line.trim().strip_prefix("\"path\"") else { continue };
+        let Some(rest) = line.trim().strip_prefix("\"path\"") else {
+            continue;
+        };
         let rest = rest.trim();
         if rest.len() >= 2 && rest.starts_with('"') && rest.ends_with('"') {
             out.push(PathBuf::from(rest[1..rest.len() - 1].replace("\\\\", "\\")));
@@ -32,9 +34,16 @@ pub fn parse_library_paths(vdf: &str) -> Vec<PathBuf> {
 
 /// Dossiers de jeu Tarkov dans une bibliothèque Steam : `steamapps/common/*tarkov*`.
 fn steam_game_dirs(library: &Path) -> Vec<PathBuf> {
-    let Ok(rd) = std::fs::read_dir(library.join("steamapps").join("common")) else { return vec![] };
+    let Ok(rd) = std::fs::read_dir(library.join("steamapps").join("common")) else {
+        return vec![];
+    };
     rd.filter_map(Result::ok)
-        .filter(|e| e.file_name().to_string_lossy().to_ascii_lowercase().contains("tarkov"))
+        .filter(|e| {
+            e.file_name()
+                .to_string_lossy()
+                .to_ascii_lowercase()
+                .contains("tarkov")
+        })
         .map(|e| e.path())
         .collect()
 }
@@ -44,11 +53,17 @@ fn steam_game_dirs(library: &Path) -> Vec<PathBuf> {
 /// * `installs` : dossiers d'installation connus (registre)
 /// * `steam_roots` : dossiers d'installation de Steam
 /// * `drives` : lettres de lecteurs présents (pour les emplacements par défaut du launcher)
-pub fn candidate_log_dirs(installs: &[PathBuf], steam_roots: &[PathBuf], drives: &[char]) -> Vec<PathBuf> {
+pub fn candidate_log_dirs(
+    installs: &[PathBuf],
+    steam_roots: &[PathBuf],
+    drives: &[char],
+) -> Vec<PathBuf> {
     let mut roots: Vec<PathBuf> = installs.to_vec();
     for steam in steam_roots {
         let mut libs = vec![steam.clone()];
-        if let Ok(text) = std::fs::read_to_string(steam.join("steamapps").join("libraryfolders.vdf")) {
+        if let Ok(text) =
+            std::fs::read_to_string(steam.join("steamapps").join("libraryfolders.vdf"))
+        {
             libs.extend(parse_library_paths(&text));
         }
         for lib in libs {
@@ -73,7 +88,10 @@ pub fn candidate_log_dirs(installs: &[PathBuf], steam_roots: &[PathBuf], drives:
 
 pub fn has_sessions(dir: &Path) -> bool {
     std::fs::read_dir(dir)
-        .map(|rd| rd.filter_map(Result::ok).any(|e| e.file_name().to_string_lossy().starts_with("log_")))
+        .map(|rd| {
+            rd.filter_map(Result::ok)
+                .any(|e| e.file_name().to_string_lossy().starts_with("log_"))
+        })
         .unwrap_or(false)
 }
 
@@ -125,7 +143,9 @@ fn sources() -> (Vec<PathBuf>, Vec<PathBuf>, Vec<char>) {
             }
         }
     }
-    let drives: Vec<char> = ('C'..='Z').filter(|d| Path::new(&format!("{d}:\\")).exists()).collect();
+    let drives: Vec<char> = ('C'..='Z')
+        .filter(|d| Path::new(&format!("{d}:\\")).exists())
+        .collect();
     (installs, steam, drives)
 }
 
@@ -160,7 +180,13 @@ mod tests {
     fn vdf_bibliotheques() {
         let vdf = "\"libraryfolders\"\n{\n\t\"0\"\n\t{\n\t\t\"path\"\t\t\"C:\\\\Program Files (x86)\\\\Steam\"\n\t\t\"label\"\t\t\"\"\n\t}\n\t\"1\"\n\t{\n\t\t\"path\"\t\t\"D:\\\\SteamLibrary\"\n\t}\n}\n";
         let p = parse_library_paths(vdf);
-        assert_eq!(p, vec![PathBuf::from("C:\\Program Files (x86)\\Steam"), PathBuf::from("D:\\SteamLibrary")]);
+        assert_eq!(
+            p,
+            vec![
+                PathBuf::from("C:\\Program Files (x86)\\Steam"),
+                PathBuf::from("D:\\SteamLibrary")
+            ]
+        );
     }
 
     #[test]
@@ -175,7 +201,11 @@ mod tests {
         let c = candidate_log_dirs(&[PathBuf::from("E:\\Jeux\\EFT")], &[], &['C', 'D']);
         assert_eq!(c[0], Path::new("E:\\Jeux\\EFT").join("Logs"));
         assert!(c.contains(&PathBuf::from("C:\\Battlestate Games\\EFT").join("Logs")));
-        assert!(c.contains(&PathBuf::from("D:\\Games\\Battlestate Games\\EFT").join("build").join("Logs")));
+        assert!(c.contains(
+            &PathBuf::from("D:\\Games\\Battlestate Games\\EFT")
+                .join("build")
+                .join("Logs")
+        ));
         // pas de doublons
         let n = c.len();
         let mut u = c.clone();
@@ -189,14 +219,28 @@ mod tests {
         let steam = root.join("Steam");
         let lib2 = root.join("SteamLibrary");
         std::fs::create_dir_all(steam.join("steamapps")).unwrap();
-        let game = lib2.join("steamapps").join("common").join("Escape from Tarkov");
-        std::fs::create_dir_all(game.join("build").join("Logs").join("log_2026.10.04_10-00-00_1.0")).unwrap();
+        let game = lib2
+            .join("steamapps")
+            .join("common")
+            .join("Escape from Tarkov");
+        std::fs::create_dir_all(
+            game.join("build")
+                .join("Logs")
+                .join("log_2026.10.04_10-00-00_1.0"),
+        )
+        .unwrap();
         std::fs::create_dir_all(lib2.join("steamapps").join("common").join("Autre Jeu")).unwrap();
-        let vdf = format!("\"libraryfolders\"\n{{\n \"1\"\n {{\n  \"path\"  \"{}\"\n }}\n}}\n", lib2.to_string_lossy().replace('\\', "\\\\"));
+        let vdf = format!(
+            "\"libraryfolders\"\n{{\n \"1\"\n {{\n  \"path\"  \"{}\"\n }}\n}}\n",
+            lib2.to_string_lossy().replace('\\', "\\\\")
+        );
         std::fs::write(steam.join("steamapps").join("libraryfolders.vdf"), vdf).unwrap();
 
         let c = candidate_log_dirs(&[], &[steam], &[]);
-        assert!(c.contains(&game.join("build").join("Logs")), "candidats : {c:?}");
+        assert!(
+            c.contains(&game.join("build").join("Logs")),
+            "candidats : {c:?}"
+        );
         assert_eq!(pick_log_dir(&c), Some(game.join("build").join("Logs")));
     }
 

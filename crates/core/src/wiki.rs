@@ -54,11 +54,13 @@ mod tests {
     #[test]
     fn titres_de_page() {
         assert_eq!(
-            page_title("https://escapefromtarkov.fandom.com/wiki/Glory_to_CPSU_-_Part_1").as_deref(),
+            page_title("https://escapefromtarkov.fandom.com/wiki/Glory_to_CPSU_-_Part_1")
+                .as_deref(),
             Some("Glory to CPSU - Part 1")
         );
         assert_eq!(
-            page_title("https://escapefromtarkov.fandom.com/wiki/Don%E2%80%99t_Believe_Your_Eyes").as_deref(),
+            page_title("https://escapefromtarkov.fandom.com/wiki/Don%E2%80%99t_Believe_Your_Eyes")
+                .as_deref(),
             Some("Don’t Believe Your Eyes")
         );
         assert_eq!(page_title("https://example.com/sans/wiki").as_deref(), None);

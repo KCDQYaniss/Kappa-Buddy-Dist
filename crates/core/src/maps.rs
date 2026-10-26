@@ -44,7 +44,11 @@ pub fn slug_from_scene(stem: &str) -> Option<&'static str> {
         ("labyrinth", "the-labyrinth"),
         ("terminal", "terminal"),
     ];
-    RULES.iter().find(|(p, _)| s.starts_with(p)).map(|(_, slug)| *slug).or_else(|| s.starts_with("icebreaker").then_some("icebreaker"))
+    RULES
+        .iter()
+        .find(|(p, _)| s.starts_with(p))
+        .map(|(_, slug)| *slug)
+        .or_else(|| s.starts_with("icebreaker").then_some("icebreaker"))
 }
 
 #[cfg(test)]
@@ -54,7 +58,10 @@ mod tests {
     fn connus() {
         assert_eq!(slug_from_location("bigmap"), Some("customs"));
         assert_eq!(slug_from_location("Sandbox_high"), Some("ground-zero"));
-        assert_eq!(slug_from_location(" TarkovStreets "), Some("streets-of-tarkov"));
+        assert_eq!(
+            slug_from_location(" TarkovStreets "),
+            Some("streets-of-tarkov")
+        );
         assert_eq!(slug_from_location("factory_day"), Some("factory"));
         assert_eq!(slug_from_location("factory_night"), Some("factory"));
     }
@@ -64,7 +71,10 @@ mod tests {
         assert_eq!(slug_from_scene("Factory4_Day_preset"), Some("factory"));
         assert_eq!(slug_from_scene("factory_day_preset"), Some("factory"));
         assert_eq!(slug_from_scene("factory_night_preset"), Some("factory"));
-        assert_eq!(slug_from_scene("shopping_mall.bundle"), Some("streets-of-tarkov"));
+        assert_eq!(
+            slug_from_scene("shopping_mall.bundle"),
+            Some("streets-of-tarkov")
+        );
         assert_eq!(slug_from_scene("rezervbase_preset"), Some("reserve"));
         assert_eq!(slug_from_scene("xyz"), None);
     }

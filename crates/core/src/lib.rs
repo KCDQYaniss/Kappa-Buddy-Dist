@@ -13,6 +13,6 @@ pub mod screenshot;
 pub mod watch;
 pub mod wiki;
 
-pub use screenshot::Position;
 pub use logs::{TaskEvent, TaskStatus};
+pub use screenshot::Position;
 pub use watch::{start, Config, Event, Handle, MapInfo};
