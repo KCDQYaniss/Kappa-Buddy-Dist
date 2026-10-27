@@ -20,11 +20,12 @@ const { ROOT, repoConfig, requireSyncedVersion, changelogNotes, normalizeAssetNa
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function gh(args, opts) {
-  return execFileSync("gh", args, Object.assign({ env: Object.assign({}, process.env, { GH_REPO: REPO }), stdio: "inherit" }, opts || {}));
+function gh(repo, args, opts) {
+  return execFileSync("gh", args, Object.assign({ env: Object.assign({}, process.env, { GH_REPO: repo }), stdio: "inherit" }, opts || {}));
 }
 
 let REPO;
+let LEGACY_REPO;
 
 /** Rassemble les fichiers à publier et échoue clairement si l'un manque. */
 function collectArtifacts(version) {
@@ -59,6 +60,10 @@ function collectArtifacts(version) {
 async function main() {
   const cfg = repoConfig();
   REPO = cfg.repo;
+  // Pendant la transition, les clients déjà installés (≤ 0.9.18) interrogent
+  // l'ancien dépôt : on y publie le miroir legacy avec le MÊME manifeste
+  // (qui point vers les assets du dépôt dist). Retirable après coup.
+  LEGACY_REPO = cfg.legacyRepo || null;
   const version = requireSyncedVersion();
   const tag = `v${version}`;
   console.log(`\nPublication de ${tag} sur ${REPO}\n`);
@@ -75,15 +80,37 @@ async function main() {
   }
   if (!exists) {
     console.log(`Création de la release ${tag}…`);
-    gh(["release", "create", tag, "--title", tag, "--notes", notes]);
+    gh(REPO, ["release", "create", tag, "--title", tag, "--notes", notes]);
   } else {
     console.log(`Release ${tag} déjà présente — mise à jour des fichiers.`);
   }
 
   // 2) Envoi de TOUS les fichiers en une seule commande (limite la fenêtre d'incohérence).
   console.log("\nEnvoi des fichiers…");
-  gh(["release", "upload", tag, ...assets, "--clobber"]);
+  gh(REPO, ["release", "upload", tag, ...assets, "--clobber"]);
   console.log(`  ${releaseAssets.join("\n  ")}`);
+
+  // 2 bis) Miroir legacy (transition uniquement) : l'ancien dépôt sert le même
+  // manifeste — les clients encore installés reçoivent la nouvelle version et,
+  // à partir d'elle, ne regardent plus que le dépôt dist.
+  if (LEGACY_REPO) {
+    console.log(`\nMiroir legacy sur ${LEGACY_REPO}…`);
+    let legacyExists = true;
+    try {
+      execFileSync("gh", ["release", "view", tag], { env: Object.assign({}, process.env, { GH_REPO: LEGACY_REPO }), stdio: "ignore" });
+    } catch {
+      legacyExists = false;
+    }
+    if (!legacyExists) {
+      console.log(`Création de la release ${tag} (miroir legacy)…`);
+      gh(LEGACY_REPO, ["release", "create", tag, "--title", tag, "--notes", notes]);
+    } else {
+      console.log(`Release ${tag} déjà présente (miroir legacy) — mise à jour des fichiers.`);
+    }
+    console.log("\nEnvoi des fichiers (miroir legacy)…");
+    gh(LEGACY_REPO, ["release", "upload", tag, ...assets, "--clobber"]);
+    console.log(`  ${releaseAssets.join("\n  ")}`);
+  }
 
   // 3) Vérification de bout en bout, avec quelques tentatives le temps que le CDN se mette à jour.
   console.log("\nVérification de la mise à jour publiée…");

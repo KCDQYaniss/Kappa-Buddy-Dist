@@ -1,5 +1,15 @@
 # Changelog / Journal des modifications
 
+## 0.9.19 — Transition d'infrastructure : dépôt de distribution
+
+### FR
+- **Les mises à jour passent par le dépôt de distribution** `Kappa-Buddy-Dist` (public, sans code source) : même installateur, même signature minisign, même contenu — où tu n'as rien à refaire. L'ancien dépôt continue de servir le manifeste pendant la transition afin que les installations existantes passent la bascule en douceur.
+- Aucune autre modification de l'application : c'est la release de consolidation avant la 1.0.0 (rebrand « Kappa Buddy » + licence).
+
+### EN
+- **Updates now flow through the distribution repo** `Kappa-Buddy-Dist` (public, source-free): same installer, same minisign signature, same content. The old repo keeps serving the redirect manifest during the transition so existing installs switch over smoothly.
+- No other application change: this is a consolidation release ahead of 1.0.0 (rebrand to “Kappa Buddy” + licensing).
+
 ## 0.9.18 — Carte à l'image de l'app + fin de la « double fenêtre »
 
 ### FR

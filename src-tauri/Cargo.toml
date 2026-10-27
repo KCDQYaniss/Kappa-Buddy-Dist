@@ -1,6 +1,6 @@
 [package]
 name = "tarkov-tracker"
-version = "0.9.18"
+version = "0.9.19"
 description = "Escape from Tarkov quest tracker and position tracker"
 edition = "2021"
 

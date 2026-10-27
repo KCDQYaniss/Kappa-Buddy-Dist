@@ -19,6 +19,19 @@ const CONF = JSON.parse(fs.readFileSync(path.join(ROOT, "src-tauri", "tauri.conf
 const PUBKEY = CONF.plugins.updater.pubkey;
 const ENDPOINT = CONF.plugins.updater.endpoints[0];
 
+// Dépôt legacy (miroir de transition) : si configuré, son manifeste doit
+// pointer exactement comme celui du dépôt dist — c'est ce que les clients
+// déjà installés (≤ 0.9.18) lisent.
+const RELEASE_CONFIG = path.join(__dirname, "release.config.json");
+const LEGACY_ENDPOINT = (() => {
+  try {
+    const cfg = JSON.parse(fs.readFileSync(RELEASE_CONFIG, "utf8"));
+    return cfg.legacyRepo ? `https://github.com/${cfg.legacyRepo}/releases/latest/download/latest.json` : null;
+  } catch {
+    return null;
+  }
+})();
+
 function fetchBuffer(url, accept, hops = 0) {
   return new Promise((resolve, reject) => {
     if (hops > 6) return reject(new Error("trop de redirections"));
@@ -60,6 +73,28 @@ async function main() {
     add("version locale = version publiée", local.version === hosted.version, `local ${local.version} / publié ${hosted.version}`);
     add("signature locale = signature publiée", local.platforms["windows-x86_64"].signature === plat.signature);
     add("url locale = url publiée", local.platforms["windows-x86_64"].url === plat.url);
+  }
+
+  // 2 bis) Miroir legacy : mêmes version, signature et url que le manifeste dist.
+  if (LEGACY_ENDPOINT) {
+    try {
+      const legacyBuf = await fetchBuffer(LEGACY_ENDPOINT + (LEGACY_ENDPOINT.includes("?") ? "&" : "?") + "t=" + Date.now(), "application/json");
+      const legacy = JSON.parse(legacyBuf.toString("utf8"));
+      const lp = legacy.platforms && legacy.platforms["windows-x86_64"];
+      const pairs = [
+        ["version", legacy.version, hosted.version],
+        ["signature", lp && lp.signature, plat.signature],
+        ["url", lp && lp.url, plat.url],
+      ];
+      const mismatch = pairs.filter(([, a, b]) => a !== b);
+      add(
+        "manifeste legacy (miroir, clients existants)",
+        mismatch.length === 0,
+        mismatch.length ? `diffère sur ${mismatch.map(([k]) => k).join(", ")}` : `identique (version ${legacy.version})`
+      );
+    } catch (e) {
+      add("manifeste legacy (miroir, clients existants)", false, e.message);
+    }
   }
 
   // 3) Installateur publié.
