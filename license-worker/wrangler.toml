@@ -1,0 +1,19 @@
+# Kappa Buddy — Worker de licence (Cloudflare, plan gratuit)
+# Déployé une fois ; les secrets ne sont PAS ici (wrangler secret put).
+name = "kappa-license"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+# ID du projet itch — visible dans l'URL de la page (itch.io/games/…/ID)
+# et récupérable via my-games quand la page existera. "" = worker dégradé
+# (health 503, activations refusées avec config_error) : voulu, pour
+# qu'un déploiement prématuré ne céderait aucune licence.
+GAME_ID = ""
+MAX_BINDS = 1                 # appareils par clé (décision : 1)
+SWAP_COOLDOWN_DAYS = 30       # délai minimum entre deux swaps self-service
+
+[[d1_databases]]
+binding = "DB"
+database_name = "kappa-license"
+database_id = "À-REMPLIR-SORTIE-WRANGLER-D1-CREATE"
