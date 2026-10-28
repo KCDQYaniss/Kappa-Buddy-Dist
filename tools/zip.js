@@ -30,7 +30,9 @@ function findExe() {
     // Le binaire principal ne porte pas le suffixe des outils de compilation.
     const main = cands.find((f) => {
       if (/build-script|setup|uninstall/i.test(f)) return false;
-      const norm = f.toLowerCase().replace(/[^a-z0-9]/g, "");
+      // Normalise SANS l'extension : « Kappa Buddy.exe » → « kappabuddy »,
+      // « tarkov-tracker.exe » → « tarkovtracker » (repli 0.9.x).
+      const norm = f.toLowerCase().replace(/\.exe$/, "").replace(/[^a-z0-9]/g, "");
       return (want && norm === want) || norm === "tarkovtracker";
     });
     if (main) return path.join(dir, main);
