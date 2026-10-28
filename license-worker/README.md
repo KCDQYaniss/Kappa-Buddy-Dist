@@ -1,5 +1,9 @@
 # license-worker — Backend de licence de Kappa Buddy
 
+> **Note** : Kappa Buddy est distribué gratuitement ; ce backend de licence n'est
+> **pas déployé et n'est pas utilisé** par l'app. Il est conservé dans le dépôt comme
+> option future (si une revente ou un gate devenait pertinent).
+
 Worker Cloudflare (gratuit) + base **D1** (SQLite). Déploiement **unique**,
 aucune gestion au quotidien : l'acheteur colle sa clé itch, le Worker lie
 son appareil et émet un **token signé perma** que l'app vérifie localement.

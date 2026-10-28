@@ -14,7 +14,8 @@
 
 Le dépôt des cartes interdit explicitement leur usage dans tout logiciel facilitant la triche
 (radars en jeu, overlays ESP, bots...). Cette app ne lit que des fichiers écrits par le jeu
-(logs et captures d'écran). Garde-la ainsi. Si tu veux distribuer ou monétiser l'app,
-il faudra d'autres cartes ou l'accord des auteurs.
+(logs et captures d'écran). Garde-la ainsi. L'app étant distribuée gratuitement, la licence
+non commerciale des cartes est respectée : toute monétisation nécessiterait d'autres cartes
+ou l'accord des auteurs.
 
 Projet indépendant, non affilié à Battlestate Games.
