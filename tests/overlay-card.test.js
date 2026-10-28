@@ -151,6 +151,28 @@ async function feed(msg, payload) {
   ok(!qs('[data-sec="buy"]').hidden, "buy montrée depuis config");
   ok($("cursor-overlay").style.getPropertyValue("--bg-a") === "0.5", "opacité 0.5 appliquée");
 
+  console.log("— i18n de la carte (fr défaut, en, ru, fallback en pour de) —");
+  await feed("", { status: "config", seq: 12, cfg: { lang: "en", opacity: 0.95, scale: 1, sections: {} } });
+  ok(qs('[data-sec="quests"] .o-label').textContent === "Quest", "label quête traduit en anglais");
+  ok(qs('[data-sec="barter_using"] .o-label').textContent === "Used in", "échangé → Used in");
+  ok(qs('[data-sec="hideout"] .o-label').textContent === "Hideout", "planque → Hideout");
+  ok(doc.documentElement.lang === "en", "html lang mis à jour");
+  await feed("", { status: "config", seq: 13, cfg: { lang: "ru" } });
+  ok(qs('[data-sec="quests"] .o-label').textContent === "Задание", "label quête en russe");
+  await feed("", {
+    status: "ok", seq: 14, autohide: 0, cfg: { lang: "ru" },
+    result: Object.assign({}, RESULT, {
+      used_in_tasks: RESULT.used_in_tasks.concat([{ id: "t3", name: "Q3" }, { id: "t4", name: "Q4" }]),
+    }),
+  });
+  ok(/ур\.\s?2/.test(text("overlay-barter-list")), "niv2 → ур. 2 en russe");
+  ok(/других/.test(text("overlay-quest-list")), "+N autres → +N других");
+  ok(/Лучший/.test(text("overlay-trader-label")), "Meilleur → Лучший");
+  await feed("", { status: "config", seq: 15, cfg: { lang: "de" } });
+  ok(doc.documentElement.lang === "en" && qs('[data-sec="quests"] .o-label').textContent === "Quest", "de → fallback anglais");
+  await feed("", { status: "config", seq: 16, cfg: { lang: "fr" } });
+  ok(qs('[data-sec="quests"] .o-label').textContent === "Quête", "retour au français");
+
   console.log(`\nTOTAL: ${passed} passés, ${failed} échoués`);
   process.exit(failed ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

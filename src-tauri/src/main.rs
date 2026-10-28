@@ -118,6 +118,14 @@ impl Settings {
         let l = self.overlay_game_lang.as_deref().unwrap_or("en").trim().to_ascii_lowercase();
         if l.is_empty() || l.len() > 3 || !l.chars().all(|c| c.is_ascii_lowercase()) { "en".to_string() } else { l }
     }
+    /// Langue affichée par la carte overlay : suit la langue de l'interface.
+    /// L'overlay n'a que fr/en/ru ; de/es retombent sur l'anglais.
+    fn overlay_lang(&self) -> String {
+        match self.lang().as_str() {
+            "fr" | "ru" => self.lang(),
+            _ => "en".to_string(),
+        }
+    }
     /// Durée d'affichage de la carte après une capture (0 = reste affichée).
     fn overlay_autohide_sec(&self) -> u32 {
         self.overlay_autohide_sec.unwrap_or(8).min(300)
@@ -206,6 +214,7 @@ fn build_overlay_cfg(s: &Settings) -> serde_json::Value {
         "scale": s.overlay_text_scale(),
         "anchor": s.overlay_anchor(),
         "sections": s.overlay_sections_map(),
+        "lang": s.overlay_lang(),
     })
 }
 

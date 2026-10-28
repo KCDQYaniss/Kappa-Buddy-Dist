@@ -168,7 +168,7 @@ body {
       <!-- Flea -->
       <div class="o-sec" data-sec="flea">
         <div class="o-row">
-          <span class="o-label">Flea</span>
+          <span class="o-label" data-i18n="o.flea">Flea</span>
           <span class="o-value"><span id="overlay-flea">—</span> <span id="flea-trend"></span></span>
         </div>
       </div>
@@ -176,7 +176,7 @@ body {
       <!-- Meilleur marchand -->
       <div class="o-sec" data-sec="traders">
         <div class="o-row">
-          <span id="overlay-trader-label" class="o-label">Meilleur</span>
+          <span id="overlay-trader-label" class="o-label" data-i18n="o.best">Meilleur</span>
           <span id="overlay-trader" class="o-value">—</span>
         </div>
       </div>
@@ -184,44 +184,44 @@ body {
       <!-- Prix par emplacement (+ /kg) -->
       <div class="o-sec" data-sec="slot">
         <div class="o-row">
-          <span class="o-label">Slot</span>
+          <span class="o-label" data-i18n="o.slot">Slot</span>
           <span id="overlay-slot" class="o-value">—</span>
         </div>
       </div>
       <div class="o-dim o-caliber" data-sec="caliber" id="overlay-caliber"></div>
       <!-- Quêtes -->
       <div class="o-sec" data-sec="quests" id="sec-quests">
-        <div class="o-row"><span class="o-label">Quête</span></div>
+        <div class="o-row"><span class="o-label" data-i18n="o.quest">Quête</span></div>
         <div class="o-list" id="overlay-quest-list"></div>
       </div>
       <!-- Barter : l'obtenir -->
       <div class="o-sec" data-sec="barter" id="sec-barter">
-        <div class="o-row"><span class="o-label">Barter</span></div>
+        <div class="o-row"><span class="o-label" data-i18n="o.barter">Barter</span></div>
         <div class="o-list" id="overlay-barter-list"></div>
       </div>
       <!-- Barter : où DÉPENSER l'objet -->
       <div class="o-sec" data-sec="barter_using" id="sec-barter-using">
-        <div class="o-row"><span class="o-label">Échangé</span></div>
+        <div class="o-row"><span class="o-label" data-i18n="o.barterUsing">Échangé</span></div>
         <div class="o-list" id="overlay-barter-using-list"></div>
       </div>
       <!-- Planque (améliorations requises) -->
       <div class="o-sec" data-sec="hideout" id="sec-hideout">
-        <div class="o-row"><span class="o-label">Planque</span></div>
+        <div class="o-row"><span class="o-label" data-i18n="o.hideout">Planque</span></div>
         <div class="o-list" id="overlay-hideout-list"></div>
       </div>
       <!-- Craft (recettes qui le produisent) -->
       <div class="o-sec" data-sec="crafts" id="sec-crafts">
-        <div class="o-row"><span class="o-label">Craft</span></div>
+        <div class="o-row"><span class="o-label" data-i18n="o.craft">Craft</span></div>
         <div class="o-list" id="overlay-craft-list"></div>
       </div>
       <!-- Achat marchand (off par défaut) -->
       <div class="o-sec" data-sec="buy" id="sec-buy">
-        <div class="o-row"><span class="o-label">Acheter</span><span id="overlay-buy" class="o-value">—</span></div>
+        <div class="o-row"><span class="o-label" data-i18n="o.buy">Acheter</span><span id="overlay-buy" class="o-value">—</span></div>
       </div>
       <!-- Texte brut lu par l'OCR (off par défaut) -->
       <div class="o-sec" data-sec="raw">
         <div class="o-row">
-          <span class="o-label">Lu</span>
+          <span class="o-label" data-i18n="o.read">Lu</span>
           <span id="overlay-raw" class="o-value dim">—</span>
         </div>
       </div>
@@ -238,6 +238,59 @@ body {
   // Sections par défaut : tout visible sauf « Acheter » et « Lu » (discrets).
   const DEFAULT_SECTIONS = { flea: 1, flea_history: 1, traders: 1, traders_all: 1, slot: 1, quests: 1, barter: 1, barter_using: 1, hideout: 1, crafts: 1, buy: 0, raw: 0 };
   let cfg = { opacity: 0.95, scale: 1, sections: Object.assign({}, DEFAULT_SECTIONS) };
+
+  /* ---------- i18n (fr/en/ru) ---------- */
+  /* La langue suit l'interface de l'app : le backend l'attache à la config
+     (`cfg.lang`, fr/en/ru — de/es sont convertis en « en » côté Rust). Le
+     Français reste le défaut tant que la première config n'est pas arrivée
+     (poll toutes les 200 ms). Les libellés d'une carte déjà affichée sont
+     re-traduits à la prochaine capture : les chaînes de contenu (niv, +N…) ne
+     sont réécrites qu'au rendu suivant. */
+  const OL_LANGS = { fr: 0, en: 1, ru: 2 };
+  const STR = {
+    "o.placeholder": ["Objet…", "Item…", "Предмет…"],
+    "o.unknown": ["Objet non reconnu", "Item not recognized", "Предмет не распознан"],
+    "o.flea": ["Flea", "Flea", "Барахолка"],
+    "o.best": ["Meilleur", "Best", "Лучший"],
+    "o.merchant": ["Marchand", "Merchant", "Торговец"],
+    "o.slot": ["Slot", "Slot", "Слот"],
+    "o.quest": ["Quête", "Quest", "Задание"],
+    "o.barter": ["Barter", "Barter", "Бартер"],
+    "o.barterUsing": ["Échangé", "Used in", "Используется"],
+    "o.hideout": ["Planque", "Hideout", "Убежище"],
+    "o.craft": ["Craft", "Craft", "Крафт"],
+    "o.buy": ["Acheter", "Buy", "Купить"],
+    "o.read": ["Lu", "Read", "Прочитано"],
+    "o.level": ["niv", "Lv ", "ур. "],
+    "o.fir": ["Found in Raid requis", "Found in Raid required", "Требуется «Найден в рейде»"],
+    "o.kappa": ["Requis pour Kappa", "Required for Kappa", "Требуется для Каппы"],
+    "o.more": ["+{n} autres…", "+{n} more…", "+{n} других…"],
+    "o.offers": ["offres", "offers", "предложений"],
+    "o.mirror": ["Miroir", "Mirror", "Зеркало"],
+    "o.wide": ["Zone élargie", "Wide area", "Расширенная зона"],
+    "o.reading": ["Lecture…", "Reading…", "Чтение…"],
+    "o.readError": ["Erreur de lecture", "Read error", "Ошибка чтения"],
+    "o.autoOn": ["Mode auto : activé", "Auto mode: on", "Авто-режим: вкл"],
+    "o.autoOff": ["Mode auto : désactivé", "Auto mode: off", "Авто-режим: выкл"],
+    "o.startTarkov": ["Lance Tarkov d'abord", "Start Tarkov first", "Сначала запустите Tarkov"],
+  };
+  let oLang = "fr";
+  function t(k, p) {
+    const row = STR[k];
+    let s = row ? row[OL_LANGS[oLang] != null ? OL_LANGS[oLang] : 1] : k;
+    if (p) for (const key of Object.keys(p)) s = s.split("{" + key + "}").join(String(p[key]));
+    return s;
+  }
+  function setLang(l) {
+    const want = OL_LANGS[l] != null ? l : "en";
+    if (want === oLang) return;
+    oLang = want;
+    document.documentElement.lang = want;
+    document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.getAttribute("data-i18n")); });
+    // Titre en état neutre uniquement : ne jamais écraser un nom d'objet réel.
+    const name = $("overlay-name");
+    if (name.classList.contains("placeholder")) name.textContent = t("o.placeholder");
+  }
 
   function fitWindow() {
     if (!invoke) return;
@@ -286,6 +339,7 @@ body {
   /* ---------- Configuration (fenêtre + sections + style) ---------- */
   function applyCfg(c) {
     if (!c) return;
+    if (typeof c.lang === "string" && c.lang) setLang(c.lang);
     const root = $("cursor-overlay");
     if (typeof c.opacity === "number" && c.opacity > 0 && c.opacity <= 1) {
       root.style.setProperty("--bg-a", String(c.opacity));
@@ -319,30 +373,30 @@ body {
       : "";
   }
 
-  function questLine(t) {
-    if (!t || !t.name) return "";
-    const st = t.task_status;
+  function questLine(task) {
+    if (!task || !task.name) return "";
+    const st = task.task_status;
     const nameCls = st === "completed" ? " done " : st === "failed" ? " failed " : " lq ";
     const bits = [];
-    if (typeof t.count === "number" && t.count > 1) bits.push("×" + t.count);
-    if (t.fir) bits.push(`<span class="o-flag" title="Found in Raid requis">⚑</span>`);
-    if (t.kappa_required) bits.push(`<span class="o-kappa" title="Requis pour Kappa">κ</span>`);
+    if (typeof task.count === "number" && task.count > 1) bits.push("×" + task.count);
+    if (task.fir) bits.push(`<span class="o-flag" title="${esc(t("o.fir"))}">⚑</span>`);
+    if (task.kappa_required) bits.push(`<span class="o-kappa" title="${esc(t("o.kappa"))}">κ</span>`);
     if (st === "completed") bits.push(`<span class="done">✓</span>`);
     if (st === "failed") bits.push(`<span class="failed">✗</span>`);
-    const lab = t.trader ? `<span class="o-sub">${esc(t.trader)}</span> ` : "";
-    return `<div class="o-line">${lab}<span class="${nameCls}">${esc(truncate(t.name, 26))}</span> ${bits.join(" ")}</div>`;
+    const lab = task.trader ? `<span class="o-sub">${esc(task.trader)}</span> ` : "";
+    return `<div class="o-line">${lab}<span class="${nameCls}">${esc(truncate(task.name, 26))}</span> ${bits.join(" ")}</div>`;
   }
 
   function barterLine(b) {
     if (!b) return "";
     const items = (b.items || []).map((i) => (i.count || 1) + "× " + esc(truncate(i.name, 18))).join(" + ");
-    return `<div class="o-line"><span class="lq">${esc(b.trader)}</span> niv${b.level ?? 1} ${items ? ": " + items : ""}</div>`;
+    return `<div class="o-line"><span class="lq">${esc(b.trader)}</span> ${t("o.level")}${b.level ?? 1} ${items ? ": " + items : ""}</div>`;
   }
 
   function barterUsingLine(b) {
     if (!b) return "";
     const rw = (b.rewards || []).map((i) => (i.count || 1) + "× " + esc(truncate(i.name, 20))).join(" + ");
-    return `<div class="o-line">→ <span class="lq">${esc(b.trader)}</span> niv${b.level ?? 1} ${rw ? ": " + rw : ""}</div>`;
+    return `<div class="o-line">→ <span class="lq">${esc(b.trader)}</span> ${t("o.level")}${b.level ?? 1} ${rw ? ": " + rw : ""}</div>`;
   }
 
   function hideoutLines(list) {
@@ -351,9 +405,9 @@ body {
     const lines = shown.map((h) => {
       if (!h) return "";
       const fir = h.fir ? ` <span class="o-flag">⚑</span>` : "";
-      return `<div class="o-line">${esc(truncate(h.station, 20))} niv${h.level ?? 1} — ${h.count}×${fir}</div>`;
+      return `<div class="o-line">${esc(truncate(h.station, 20))} ${t("o.level")}${h.level ?? 1} — ${h.count}×${fir}</div>`;
     }).filter(Boolean);
-    if ((list || []).length > max) lines.push(`<div class="o-more">+${list.length - max} autres…</div>`);
+    if ((list || []).length > max) lines.push(`<div class="o-more">${t("o.more", { n: list.length - max })}</div>`);
     return lines.join("");
   }
 
@@ -362,7 +416,7 @@ body {
     const items = (c.items || []).map((i) => (i.count || 1) + "× " + esc(truncate(i.name, 18))).join(" + ");
     const dur = c.duration_sec ? "~" + Math.max(1, Math.round(c.duration_sec / 3600)) + "h" : "";
     const more = extraCount > 0 ? ` +${extraCount}` : "";
-    return `<div class="o-line"><span class="lq">${esc(truncate(c.station, 16))}</span> niv${c.level ?? 1} ${dur}${more}</div>` +
+    return `<div class="o-line"><span class="lq">${esc(truncate(c.station, 16))}</span> ${t("o.level")}${c.level ?? 1} ${dur}${more}</div>` +
            (items ? `<div class="o-line o-sub">← ${items}</div>` : "");
   }
 
@@ -387,7 +441,7 @@ body {
     applyCfg(d.cfg);
     const hasItem = !!(d.item_name || d.short_name);
     const n = d.item_name || d.short_name || (d.raw_text ? d.raw_text.trim() : "");
-    $("overlay-name").textContent = n ? truncate(n, 30) : (hasItem ? "" : "Objet non reconnu");
+    $("overlay-name").textContent = n ? truncate(n, 30) : (hasItem ? "" : t("o.unknown"));
     $("overlay-name").classList.toggle("placeholder", !d.item_name && !d.short_name);
     $("overlay-icon").style.backgroundImage = d.icon ? "url(\"" + d.icon + "\")" : "";
     // Sous-titre : calibre/ammo pack/quelle info utile
@@ -399,8 +453,8 @@ body {
     // Transparence : dire quand la lecture vient d'une boîte de secours et non
     // de la principale — un « miroir »/« élargie » sur un faux voisin explique
     // tout de suite le désaccord.
-    if (d.attempt === "mirror") subBits.push('\u29c9 Miroir');
-    else if (d.attempt === "wide") subBits.push('\u29c9 Zone élargie');
+    if (d.attempt === "mirror") subBits.push("\u29c9 " + t("o.mirror"));
+    else if (d.attempt === "wide") subBits.push("\u29c9 " + t("o.wide"));
     sub.className = "o-sub" + (subBits.length ? "" : " hidden");
     sub.innerHTML = subBits.join(" · ");
 
@@ -411,12 +465,12 @@ body {
     if (r.flea_low_24h != null || r.flea_high_24h != null) {
       hist.push("24h " + fmtK(r.flea_low_24h) + " – " + fmtK(r.flea_high_24h));
     }
-    if (r.flea_last_offer_count != null) hist.push(r.flea_last_offer_count + " offres");
+    if (r.flea_last_offer_count != null) hist.push(r.flea_last_offer_count + " " + t("o.offers"));
     $("overlay-flea-history").textContent = hist.join(" · ");
 
     // Meilleur marchand : sell_for trie déjà du plus haut au plus bas.
     const best = Array.isArray(r.sell_for) && r.sell_for.length ? r.sell_for[0] : null;
-    $("overlay-trader-label").textContent = best ? "Meilleur" : "Marchand";
+    $("overlay-trader-label").textContent = best ? t("o.best") : t("o.merchant");
     $("overlay-trader").textContent = best
       ? `${esc(best.name)} — ${fmtP(best.price)}`
       : fmtP(r.trader_price);
@@ -430,14 +484,14 @@ body {
     if (q.length) {
       const max = 3;
       $("overlay-quest-list").innerHTML = q.slice(0, max).map(questLine).join("") +
-        (q.length > max ? `<div class="o-more">+${q.length - max} autres…</div>` : "");
+        (q.length > max ? `<div class="o-more">${t("o.more", { n: q.length - max })}</div>` : "");
     }
 
     const br = (r.barters_for || []).filter(Boolean);
     $("sec-barter").hidden = !cfg.sections.barter || !br.length;
     if (br.length) {
       $("overlay-barter-list").innerHTML = barterLine(br[0]) +
-        (br.length > 1 ? `<div class="o-more">+${br.length - 1} autres…</div>` : "");
+        (br.length > 1 ? `<div class="o-more">${t("o.more", { n: br.length - 1 })}</div>` : "");
     }
 
     const bu = (r.barters_using || []).filter(Boolean);
@@ -454,7 +508,7 @@ body {
 
     const bf = (r.buy_for || []).filter(Boolean);
     if (bf.length) {
-      $("overlay-buy").textContent = `${esc(bf[0].name)} niv${bf[0].min_level ?? 1} — ${fmtP(bf[0].price)}`;
+      $("overlay-buy").textContent = `${esc(bf[0].name)} ${t("o.level")}${bf[0].min_level ?? 1} — ${fmtP(bf[0].price)}`;
     } else { $("overlay-buy").textContent = "—"; }
 
     $("overlay-raw").textContent = truncate((r.raw_text || "").trim() || "—", 44);
@@ -479,7 +533,7 @@ body {
   }
 
   function showLoading() {
-    $("overlay-name").textContent = "Lecture…";
+    $("overlay-name").textContent = t("o.reading");
     $("overlay-name").classList.add("placeholder");
     $("overlay-icon").style.backgroundImage = "";
     $("overlay-sub").className = "o-sub hidden";
@@ -491,7 +545,7 @@ body {
   }
 
   function showError(msg, secs) {
-    $("overlay-name").textContent = truncate(msg || "Erreur de lecture", 30);
+    $("overlay-name").textContent = truncate(msg || t("o.readError"), 30);
     $("overlay-name").classList.remove("placeholder");
     $("overlay-icon").style.backgroundImage = "";
     $("overlay-sub").className = "o-sub hidden";
@@ -536,15 +590,15 @@ body {
         const secs = data.autohide || 0;
         if (secs > 0) hideTimer = setTimeout(hide, secs * 1000);
       } else if (status === "auto-on") {
-        renderInfo("Mode auto : activé", data.autohide || 3);
+        renderInfo(t("o.autoOn"), data.autohide || 3);
       } else if (status === "auto-off") {
-        renderInfo("Mode auto : désactivé", data.autohide || 3);
+        renderInfo(t("o.autoOff"), data.autohide || 3);
       } else if (status === "hide") {
         forceHide();
       } else if (status === "error") {
-        showError(data.message || "Erreur de lecture", data.autohide);
+        showError(data.message || t("o.readError"), data.autohide);
       } else if (status === "not-in-game") {
-        showError("Lance Tarkov d'abord", data.autohide || 4);
+        showError(t("o.startTarkov"), data.autohide || 4);
       }
     } catch (e) {}
   }
