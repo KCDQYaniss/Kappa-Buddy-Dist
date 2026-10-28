@@ -8,6 +8,7 @@ pub mod dataset;
 pub mod diag;
 pub mod logs;
 pub mod maps;
+pub mod msg;
 pub mod paths;
 pub mod screenshot;
 pub mod watch;

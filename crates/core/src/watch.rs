@@ -1,8 +1,10 @@
 use crate::logs::{self, MapHit, NotifParser, Tail, TaskEvent};
+use crate::msg::msg;
 use crate::screenshot::{parse_screenshot_name, Position};
 use notify::event::ModifyKind;
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
+use serde_json::json;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -159,16 +161,20 @@ where
         match notify::recommended_watcher(handler) {
             Ok(mut w) => match w.watch(&cfg.screenshots_dir, RecursiveMode::NonRecursive) {
                 Ok(()) => watchers.push(w),
-                Err(e) => sink(Event::Warning(format!(
-                    "Surveillance des screenshots impossible : {e}"
+                Err(e) => sink(Event::Warning(msg(
+                    "w.screenshotsWatch",
+                    json!({"e": e.to_string()}),
                 ))),
             },
-            Err(e) => sink(Event::Warning(format!("Watcher screenshots : {e}"))),
+            Err(e) => sink(Event::Warning(msg(
+                "w.screenshotsWatcher",
+                json!({"e": e.to_string()}),
+            ))),
         }
     } else {
-        sink(Event::Warning(format!(
-            "Dossier de screenshots introuvable : {} (il est créé par le jeu à la première capture)",
-            cfg.screenshots_dir.display()
+        sink(Event::Warning(msg(
+            "w.screenshotsDir",
+            json!({"dir": cfg.screenshots_dir.display().to_string()}),
         )));
     }
 
@@ -204,9 +210,15 @@ where
             match notify::recommended_watcher(handler) {
                 Ok(mut w) => match w.watch(dir, RecursiveMode::Recursive) {
                     Ok(()) => watchers.push(w),
-                    Err(e) => sink(Event::Warning(format!("Surveillance des logs impossible : {e}"))),
+                    Err(e) => sink(Event::Warning(msg(
+                        "w.logsWatch",
+                        json!({"e": e.to_string()}),
+                    ))),
                 },
-                Err(e) => sink(Event::Warning(format!("Watcher logs : {e}"))),
+                Err(e) => sink(Event::Warning(msg(
+                    "w.logsWatcher",
+                    json!({"e": e.to_string()}),
+                ))),
             }
 
             // 2) Filet de sécurité : Windows ne prévient pas toujours quand un autre processus ajoute
@@ -226,7 +238,7 @@ where
             }
         }
         None => sink(Event::Warning(
-            "Dossier de logs introuvable : renseigne-le dans Réglages (le diagnostic t'indique où chercher).".into(),
+            "w.logsDir".into(),
         )),
     }
 

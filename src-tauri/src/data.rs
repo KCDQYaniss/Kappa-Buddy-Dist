@@ -14,6 +14,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tarkov_core::dataset::{self, Envelope, ItemsDoc, Lax, MapsDoc, Quality, TasksDoc};
+use tarkov_core::msg::{code, msg};
 use tauri::{AppHandle, Emitter, Manager};
 
 const BASE: &str = "https://json.tarkov.dev";
@@ -30,7 +31,7 @@ fn dir(app: &AppHandle) -> Result<PathBuf, String> {
 fn cache_file(app: &AppHandle, lang: &str) -> Result<PathBuf, String> {
     // `lang` vient de l'interface : on le restreint pour éviter tout chemin inattendu.
     if lang.is_empty() || !lang.chars().all(|c| c.is_ascii_lowercase()) || lang.len() > 3 {
-        return Err("langue invalide".into());
+        return Err(code("data.badLang"));
     }
     Ok(dir(app)?.join(format!("data-v3-{lang}.json")))
 }
@@ -57,13 +58,13 @@ fn get<T: DeserializeOwned>(agent: &ureq::Agent, path: &str) -> Result<T, String
     let mut delay = Duration::from_secs(2);
     for attempt in 0..3 {
         let res: Result<T, (u16, String)> = (|| {
-            let mut resp = agent.get(&url).header("Accept", "application/json").call().map_err(|e| (0, format!("réseau : {e}")))?;
+            let mut resp = agent.get(&url).header("Accept", "application/json").call().map_err(|e| (0, msg("data.network", serde_json::json!({"e": e.to_string()}))))?;
             let status = resp.status().as_u16();
             if !(200..300).contains(&status) {
                 let text = resp.body_mut().read_to_string().unwrap_or_default();
-                return Err((status, format!("HTTP {status} : {}", excerpt(&text))));
+                return Err((status, msg("data.http", serde_json::json!({"status": status, "body": excerpt(&text)}))));
             }
-            resp.body_mut().with_config().limit(512 * 1024 * 1024).read_json::<T>().map_err(|e| (status, format!("réponse illisible : {e}")))
+            resp.body_mut().with_config().limit(512 * 1024 * 1024).read_json::<T>().map_err(|e| (status, msg("data.unreadable", serde_json::json!({"e": e.to_string()}))))
         })();
         match res {
             Ok(v) => return Ok(v),
@@ -71,10 +72,10 @@ fn get<T: DeserializeOwned>(agent: &ureq::Agent, path: &str) -> Result<T, String
                 std::thread::sleep(delay);
                 delay *= 2;
             }
-            Err((_, e)) => return Err(format!("{path} : {e}")),
+            Err((_, e)) => return Err(msg("data.downloadFailed", serde_json::json!({"path": path, "reason": e}))),
         }
     }
-    Err(format!("{path} : trop d'échecs"))
+    Err(msg("data.retries", serde_json::json!({"path": path})))
 }
 
 /// Table de traduction `<name>_<lang>` ; repli sur l'anglais si la langue n'existe pas.
@@ -82,7 +83,7 @@ fn translations(agent: &ureq::Agent, name: &str, lang: &str) -> Result<dataset::
     let first = get::<Envelope<HashMap<String, Lax>>>(agent, &format!("{name}_{lang}"));
     let doc = match first {
         Ok(d) => d,
-        Err(e) if lang != "en" => get::<Envelope<HashMap<String, Lax>>>(agent, &format!("{name}_en")).map_err(|e2| format!("{e} ; repli sur l'anglais : {e2}"))?,
+        Err(e) if lang != "en" => get::<Envelope<HashMap<String, Lax>>>(agent, &format!("{name}_en")).map_err(|e2| msg("data.fallbackEn", serde_json::json!({"reason": e, "en": e2})))?,
         Err(e) => return Err(e),
     };
     Ok(dataset::table_from(doc.data))
@@ -229,18 +230,22 @@ fn download(app: &AppHandle, lang: &str) -> Result<String, String> {
     let previous: Option<Value> = std::fs::read_to_string(&path).ok().and_then(|t| serde_json::from_str(&t).ok());
     let old = |k: &str| previous.as_ref().and_then(|v| v.get(k)).cloned();
     let step = |label: &str| {
-        let _ = app.emit("data-progress", format!("Téléchargement : {label}…"));
+        let _ = app.emit("data-progress", msg("data.progress", serde_json::json!({"label": label})));
     };
 
     let mut q = Quality::default();
     let mut warnings: Vec<String> = Vec::new();
     let mut ok_count = 0;
     let mut keep = |what: &str, e: String, had_old: bool| {
-        warnings.push(format!("{what} : {e}{}", if had_old { " (anciennes données conservées)" } else { "" }));
+        warnings.push(msg("data.keep", serde_json::json!({
+            "what": what,
+            "e": e,
+            "old": if had_old { code("data.oldKept") } else { String::new() },
+        })));
     };
 
     // 1) Objets (leurs noms servent aussi à nommer les conteneurs).
-    step("objets");
+    step("dl.items");
     let items = (|| -> Result<dataset::ItemsOut, String> {
         let doc: Envelope<ItemsDoc> = get(&agent, "items")?;
         let t = translations(&agent, "items", lang)?;
@@ -252,13 +257,13 @@ fn download(app: &AppHandle, lang: &str) -> Result<String, String> {
             (o.items, o.names)
         }
         Err(e) => {
-            keep("objets", e, old("items").is_some());
+            keep("dl.items", e, old("items").is_some());
             (old("items").unwrap_or_else(|| Value::Array(vec![])), HashMap::new())
         }
     };
 
     // 2) Marchands (facultatif : sans eux les quêtes s'affichent, mais sans regroupement par marchand).
-    step("marchands");
+    step("dl.traders");
     let traders = (|| -> Result<HashMap<String, Value>, String> {
         let doc: Envelope<Value> = get(&agent, "traders")?;
         let t = translations(&agent, "traders", lang)?;
@@ -267,13 +272,13 @@ fn download(app: &AppHandle, lang: &str) -> Result<String, String> {
     let traders = match traders {
         Ok(t) => t,
         Err(e) => {
-            keep("marchands", e, false);
+            keep("dl.traders", e, false);
             HashMap::new()
         }
     };
 
     // 3) Cartes.
-    step("cartes");
+    step("dl.maps");
     let maps = (|| -> Result<dataset::MapsOut, String> {
         let doc: Envelope<MapsDoc> = get(&agent, "maps")?;
         let t = translations(&agent, "maps", lang)?;
@@ -288,15 +293,15 @@ fn download(app: &AppHandle, lang: &str) -> Result<String, String> {
             (o.maps, Some(o.slugs))
         }
         Err(e) => {
-            keep("cartes", e, old("maps").is_some());
+            keep("dl.maps", e, old("maps").is_some());
             (old("maps").unwrap_or_else(|| Value::Array(vec![])), None)
         }
     };
 
     // 4) Quêtes (ont besoin des identifiants de cartes pour placer leurs zones).
-    step("quêtes");
+    step("dl.tasks");
     let tasks = match &slugs {
-        None => Err("dépend des cartes, qui n'ont pas pu être téléchargées".to_string()),
+        None => Err(code("data.dependsMaps")),
         Some(slugs) => (|| -> Result<Value, String> {
             let doc: Envelope<TasksDoc> = get(&agent, "tasks")?;
             let t = translations(&agent, "tasks", lang)?;
@@ -313,13 +318,13 @@ fn download(app: &AppHandle, lang: &str) -> Result<String, String> {
             v
         }
         Err(e) => {
-            keep("quêtes", e, old("tasks").is_some());
+            keep("dl.tasks", e, old("tasks").is_some());
             old("tasks").unwrap_or_else(|| Value::Array(vec![]))
         }
     };
 
     // 5) Hideout (facultatif : sert à dire quels objets servent au hideout).
-    step("hideout");
+    step("dl.hideout");
     let hideout = (|| -> Result<Value, String> {
         let doc: Envelope<Value> = get(&agent, "hideout")?;
         let t = translations(&agent, "hideout", lang)?;
@@ -331,7 +336,7 @@ fn download(app: &AppHandle, lang: &str) -> Result<String, String> {
             v
         }
         Err(e) => {
-            keep("hideout", e, old("hideout").is_some());
+            keep("dl.hideout", e, old("hideout").is_some());
             old("hideout").unwrap_or_else(|| Value::Array(vec![]))
         }
     };
@@ -346,8 +351,8 @@ fn download(app: &AppHandle, lang: &str) -> Result<String, String> {
     // Écriture atomique : un téléchargement interrompu ne corrompt pas le cache.
     let text = serde_json::to_string(&all).map_err(|e| e.to_string())?;
     let tmp = path.with_extension("json.tmp");
-    std::fs::write(&tmp, &text).map_err(|e| format!("Écriture du cache : {e}"))?;
-    std::fs::rename(&tmp, &path).map_err(|e| format!("Écriture du cache : {e}"))?;
+    std::fs::write(&tmp, &text).map_err(|e| msg("data.cacheWrite", serde_json::json!({"e": e.to_string()})))?;
+    std::fs::rename(&tmp, &path).map_err(|e| msg("data.cacheWrite", serde_json::json!({"e": e.to_string()})))?;
 
     // Les avertissements sont renvoyés à l'interface mais pas stockés dans le cache.
     all["warnings"] = serde_json::json!(warnings);
@@ -395,7 +400,7 @@ fn read_json_file(path: PathBuf) -> Result<Option<String>, String> {
 }
 
 fn write_json_file(path: PathBuf, json: &str) -> Result<(), String> {
-    serde_json::from_str::<Value>(json).map_err(|e| format!("JSON invalide : {e}"))?;
+    serde_json::from_str::<Value>(json).map_err(|e| msg("data.badJson", serde_json::json!({"e": e.to_string()})))?;
     let tmp = path.with_extension("json.tmp");
     std::fs::write(&tmp, json).map_err(|e| e.to_string())?;
     std::fs::rename(&tmp, &path).map_err(|e| e.to_string())

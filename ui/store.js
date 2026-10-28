@@ -412,10 +412,10 @@
   }
   /** Texte à afficher à la place d'une liste vide quand on n'a pas de données. */
   function emptyMessage() {
-    if (S.busy) return S.busy;
+    if (S.busy) return TT.i18n.rt(S.busy);
     if (S.error) {
       const tm = S.retryAt ? hhmm(S.retryAt) : "";
-      return S.error.split("\n")[0] + (tm ? t("misc.retryAt", { time: tm }) : "");
+      return TT.i18n.rt(S.error.split("\n")[0]) + (tm ? t("misc.retryAt", { time: tm }) : "");
     }
     return t("misc.noData");
   }

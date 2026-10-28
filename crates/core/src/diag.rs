@@ -2,9 +2,16 @@
 //!
 //! Le résultat est une liste de points (`issues`) : chacun dit ce qui a été observé, ce que ça
 //! implique et quoi faire. L'interface les affiche en verdict clair, du plus grave au plus anodin.
+//!
+//! Les textes destinés à l'utilisateur partent sous forme codée (`code` ou `code {json}`,
+//! voir [`crate::msg`]) : l'interface les traduit dans la langue choisie. Un code inconnu
+//! s'affiche tel quel. Les valeurs dynamiques (chemins, noms de fichiers) vivent dans les
+//! paramètres JSON, jamais concaténées au code.
 
+use crate::msg::{code, msg};
 use crate::{logs, paths};
 use serde::Serialize;
+use serde_json::json;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -15,10 +22,11 @@ use std::time::SystemTime;
 pub struct Issue {
     /// « error » (empêche la détection), « warn » (gêne), « ok » (vérification réussie).
     pub severity: String,
+    /// Message codé (voir [`crate::msg`]) : ce qui cloche.
     pub title: String,
-    /// Ce qui a été observé, en clair.
+    /// Message codé : ce qui a été observé, en clair.
     pub detail: String,
-    /// Quoi faire. Vide pour un point qui va bien.
+    /// Message codé : quoi faire. Vide pour un point qui va bien.
     pub fix: String,
 }
 
@@ -36,8 +44,9 @@ pub struct FileInfo {
 #[derive(Debug, Serialize, Default)]
 pub struct Diagnostics {
     pub logs_dir: Option<String>,
+    /// Code i18n de la source du dossier (« diag.srcManual » / « diag.srcAuto »…).
     pub logs_dir_source: String,
-    /// Emplacements vérifiés automatiquement, avec « oui/non » selon qu'ils existent.
+    /// Emplacements vérifiés automatiquement : « {chemin} : diag.exists|diag.absent ».
     pub tried: Vec<String>,
     pub sessions: usize,
     pub latest_session: Option<String>,
@@ -54,7 +63,7 @@ pub struct Diagnostics {
     pub newest_screenshot_secs_ago: Option<u64>,
     /// Verdict structuré, prêt à afficher.
     pub issues: Vec<Issue>,
-    /// Résumé texte de chaque point (compatibilité et copie de rapport).
+    /// Résumé texte de chaque point (titres codés, résolus à l'affichage par l'interface).
     pub hints: Vec<String>,
 }
 
@@ -111,28 +120,27 @@ pub fn diagnose(manual_logs: Option<&Path>, screenshots: &Path) -> Diagnostics {
             format!(
                 "{} : {}",
                 p.display(),
-                if p.is_dir() { "existe" } else { "absent" }
+                if p.is_dir() { "diag.exists" } else { "diag.absent" }
             )
         })
         .collect();
     let logs: Option<PathBuf> = match manual_logs {
         Some(m) if m.is_dir() => {
-            d.logs_dir_source = "réglage manuel".into();
+            d.logs_dir_source = "diag.srcManual".into();
             Some(m.to_path_buf())
         }
         Some(m) => {
             d.issue(
                 ERROR,
-                format!("Le dossier de logs indiqué n'existe pas : {}", m.display()),
-                "Réglages → « Dossier des logs du jeu » pointe vers un dossier absent.".to_string(),
-                "Corrige le chemin, ou vide le champ pour laisser la détection automatique."
-                    .to_string(),
+                msg("diag.r.manualMissing", json!({"path": m.display().to_string()})),
+                code("diag.r.manualMissing.detail"),
+                code("diag.r.manualMissing.fix"),
             );
-            d.logs_dir_source = "réglage manuel (introuvable)".into();
+            d.logs_dir_source = "diag.srcManualMissing".into();
             None
         }
         None => {
-            d.logs_dir_source = "détection automatique".into();
+            d.logs_dir_source = "diag.srcAuto".into();
             paths::pick_log_dir(&candidates)
         }
     };
@@ -142,9 +150,9 @@ pub fn diagnose(manual_logs: Option<&Path>, screenshots: &Path) -> Diagnostics {
         if manual_logs.is_none() {
             d.issue(
                 ERROR,
-                "Dossier des logs introuvable".to_string(),
-                format!("Aucun emplacement connu ne contient de logs ({} vérifiés).", d.tried.len()),
-                "Cherche un dossier « Logs » dans le dossier d'installation du jeu (avec Steam : …\\Escape from Tarkov\\build\\Logs) et colle son chemin dans Réglages.".to_string(),
+                code("diag.r.logsMissing"),
+                msg("diag.r.logsMissing.detail", json!({"n": d.tried.len()})),
+                code("diag.r.logsMissing.fix"),
             );
         }
         return finish(d, screenshots);
@@ -161,9 +169,9 @@ pub fn diagnose(manual_logs: Option<&Path>, screenshots: &Path) -> Diagnostics {
     if d.sessions == 0 {
         d.issue(
             ERROR,
-            "Ce dossier ne contient aucune session « log_… »".to_string(),
-            format!("Le dossier {} n'a pas la structure des logs du jeu.", logs.display()),
-            "Ce n'est probablement pas le bon dossier. Vise le dossier « Logs » du jeu (avec Steam : …\\Escape from Tarkov\\build\\Logs).".to_string(),
+            code("diag.r.logsNoSessions"),
+            msg("diag.r.logsNoSessions.detail", json!({"dir": logs.display().to_string()})),
+            code("diag.r.logsNoSessions.fix"),
         );
         return finish(d, screenshots);
     }
@@ -205,13 +213,12 @@ pub fn diagnose(manual_logs: Option<&Path>, screenshots: &Path) -> Diagnostics {
     match app_log {
         None => d.issue(
             ERROR,
-            "Aucun fichier « application.log » dans la dernière session".to_string(),
-            format!(
-                "Session {} : aucun fichier d'application trouvé.",
-                d.latest_session.as_deref().unwrap_or("?")
+            code("diag.r.logsNoAppLog"),
+            msg(
+                "diag.r.logsNoAppLog.detail",
+                json!({"session": d.latest_session.as_deref().unwrap_or("?")}),
             ),
-            "Lance une partie (au moins jusqu'au chargement du raid) puis relance ce diagnostic."
-                .to_string(),
+            code("diag.r.logsNoAppLog.fix"),
         ),
         Some((_, p)) => {
             let text = read_tail(&p, 4 * 1024 * 1024);
@@ -233,21 +240,19 @@ pub fn diagnose(manual_logs: Option<&Path>, screenshots: &Path) -> Diagnostics {
             if d.last_map_raw.is_none() {
                 d.issue(
                     WARN,
-                    "Le log ne contient aucune ligne de map".to_string(),
-                    "Le fichier est lisible mais aucune ligne « Location: » n'y a été trouvée.".to_string(),
-                    "Lance une partie jusqu'au chargement du raid, prends une capture d'écran, puis relance ce diagnostic.".to_string(),
+                    code("diag.r.noMapLine"),
+                    code("diag.r.noMapLine.detail"),
+                    code("diag.r.noMapLine.fix"),
                 );
             } else if d.last_map_slug.is_none() {
                 d.issue(
                     WARN,
-                    format!(
-                        "Map « {} » trouvée mais non reconnue",
-                        d.last_map_raw.as_deref().unwrap_or("")
+                    msg(
+                        "diag.r.unknownMap",
+                        json!({"raw": d.last_map_raw.as_deref().unwrap_or("")}),
                     ),
-                    "Le nom de la carte dans le log ne correspond à aucune carte connue."
-                        .to_string(),
-                    "Signale-le : la correspondance sera ajoutée dans une prochaine version."
-                        .to_string(),
+                    code("diag.r.unknownMap.detail"),
+                    code("diag.r.unknownMap.fix"),
                 );
             }
         }
@@ -257,11 +262,9 @@ pub fn diagnose(manual_logs: Option<&Path>, screenshots: &Path) -> Diagnostics {
     if notif_logs.is_empty() {
         d.issue(
             WARN,
-            "Aucun fichier de notifications dans la dernière session".to_string(),
-            "Sans lui, les quêtes démarrées ou terminées en jeu ne peuvent pas être détectées."
-                .to_string(),
-            "Vérifie le dossier des logs, puis lance une partie et relance ce diagnostic."
-                .to_string(),
+            code("diag.r.notifEmpty"),
+            code("diag.r.notifEmpty.detail"),
+            code("diag.r.notifEmpty.fix"),
         );
     }
     for p in &notif_logs {
@@ -282,19 +285,18 @@ pub fn diagnose(manual_logs: Option<&Path>, screenshots: &Path) -> Diagnostics {
     if !notif_logs.is_empty() && d.task_events_latest_session == 0 {
         d.issue(
             WARN,
-            "Aucun évènement de quête lu dans la dernière session".to_string(),
-            format!("{} fichier(s) de notifications lu(s), aucun message de quête reconnu.", notif_logs.len()),
-            "C'est normal si tu n'as pas démarré ni terminé de quête dans cette partie. Sinon, copie les détails ci-dessous dans un rapport.".to_string(),
+            code("diag.r.noQuestEvents"),
+            msg("diag.r.noQuestEvents.detail", json!({"n": notif_logs.len()})),
+            code("diag.r.noQuestEvents.fix"),
         );
     }
     if let Some(age) = session_age {
         if age > 24 * 3600 {
             d.issue(
                 WARN,
-                "La dernière session de logs date d'il y a plus d'un jour".to_string(),
-                format!("Fichiers modifiés il y a {} h.", age / 3600),
-                "Le suivi en direct reprendra dès que le jeu écrira dans un nouveau log."
-                    .to_string(),
+                code("diag.r.staleSession"),
+                msg("diag.r.staleSession.detail", json!({"h": age / 3600})),
+                code("diag.r.staleSession.fix"),
             );
         }
     }
@@ -305,9 +307,9 @@ fn finish(mut d: Diagnostics, screenshots: &Path) -> Diagnostics {
     if !d.screenshots_dir_exists {
         d.issue(
             ERROR,
-            "Le dossier de captures n'existe pas".to_string(),
-            format!("{} est absent.", screenshots.display()),
-            "Sans captures, la position sur la carte ne peut pas être suivie. Il est créé par le jeu à la première capture ; prends-en une en jeu.".to_string(),
+            code("diag.r.screenshotsMissing"),
+            msg("diag.r.screenshotsMissing.detail", json!({"dir": screenshots.display().to_string()})),
+            code("diag.r.screenshotsMissing.fix"),
         );
     } else {
         let newest = std::fs::read_dir(screenshots)
@@ -330,28 +332,33 @@ fn finish(mut d: Diagnostics, screenshots: &Path) -> Diagnostics {
                     if age > 30 * 24 * 3600 {
                         d.issue(
                             WARN,
-                            "Aucune capture d'écran récente".to_string(),
-                            format!("La plus récente ({}) date de {} jours.", d.newest_screenshot.as_deref().unwrap_or("?"), age / 86400),
-                            "Prends une capture en jeu avec la touche dédiée : la position se mettra à jour.".to_string(),
+                            code("diag.r.screenshotOld"),
+                            msg(
+                                "diag.r.screenshotOld.detail",
+                                json!({
+                                    "name": d.newest_screenshot.as_deref().unwrap_or("?"),
+                                    "days": age / 86400,
+                                }),
+                            ),
+                            code("diag.r.screenshotOld.fix"),
                         );
                     }
                 }
             }
             None => d.issue(
                 WARN,
-                "Aucune capture d'écran dans le dossier".to_string(),
-                format!("{} est vide.", screenshots.display()),
-                "Prends une capture en jeu avec la touche dédiée : la position se mettra à jour."
-                    .to_string(),
+                code("diag.r.screenshotEmpty"),
+                msg("diag.r.screenshotEmpty.detail", json!({"dir": screenshots.display().to_string()})),
+                code("diag.r.screenshotEmpty.fix"),
             ),
         }
     }
     if d.issues.is_empty() {
         d.issue(
             OK,
-            "Tout semble en ordre côté logs.".to_string(),
-            "Logs, map et quêtes sont lisibles : la détection fonctionne.".to_string(),
-            "".to_string(),
+            code("diag.r.okLogs"),
+            code("diag.r.okLogs.detail"),
+            String::new(),
         );
     }
     d
@@ -372,7 +379,7 @@ mod tests {
     fn dossier_manuel_inexistant() {
         let d = diagnose(Some(Path::new("Z:\\nulle part")), &tmp("s1"));
         assert!(d.logs_dir.is_none());
-        assert!(d.hints.iter().any(|h| h.contains("n'existe pas")));
+        assert!(d.hints.iter().any(|h| h.contains("diag.r.manualMissing")));
     }
 
     #[test]
@@ -380,7 +387,7 @@ mod tests {
         let logs = tmp("l2");
         let d = diagnose(Some(&logs), &tmp("s2"));
         assert_eq!(d.sessions, 0);
-        assert!(d.hints.iter().any(|h| h.contains("log_")));
+        assert!(d.hints.iter().any(|h| h.contains("diag.r.logsNoSessions")));
     }
 
     #[test]
@@ -424,10 +431,7 @@ mod tests {
         .unwrap();
         let d = diagnose(Some(&logs), &tmp("s5"));
         assert_eq!(d.task_events_latest_session, 2);
-        assert!(!d
-            .hints
-            .iter()
-            .any(|h| h.contains("Aucun fichier de notifications")));
+        assert!(!d.hints.iter().any(|h| h.contains("diag.r.notifEmpty")));
     }
 
     #[test]
@@ -438,6 +442,6 @@ mod tests {
         std::fs::write(s.join("x application.log"), "rien d'utile\n").unwrap();
         let d = diagnose(Some(&logs), &tmp("s4"));
         assert!(d.last_map_raw.is_none());
-        assert!(d.hints.iter().any(|h| h.contains("aucune ligne de map")));
+        assert!(d.hints.iter().any(|h| h.contains("diag.r.noMapLine")));
     }
 }

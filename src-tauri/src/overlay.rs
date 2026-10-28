@@ -18,6 +18,7 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use device_query::{DeviceQuery, DeviceState};
 use tauri::AppHandle;
+use tarkov_core::msg::{code, msg};
 
 static OVERLAY_ENABLED: AtomicBool = AtomicBool::new(false);
 static OVERLAY_PID: AtomicU32 = AtomicU32::new(0);
@@ -58,9 +59,9 @@ pub async fn start_overlay(config: OverlayConfig) -> Result<(), String> {
     match result {
         Ok(inner) => inner,
         Err(join_err) => {
-            let msg = format!("Spawn task panicked: {:?}", join_err);
-            eprintln!("[overlay] {}", msg);
-            Err(msg)
+            let detail = format!("{:?}", join_err);
+            eprintln!("[overlay] spawn task panicked: {}", detail);
+            Err(msg("ov.startFailed", serde_json::json!({"e": detail})))
         }
     }
 }
@@ -95,7 +96,7 @@ fn spawn_sidecar(_config: OverlayConfig) -> Result<(), String> {
     }
 
     if !sidecar_path.exists() {
-        return Err("Failed to obtain sidecar after download attempt".to_string());
+        return Err(code("ov.sidecarObtain"));
     }
 
     println!("[overlay] Starting sidecar process...");
@@ -114,7 +115,7 @@ fn spawn_sidecar(_config: OverlayConfig) -> Result<(), String> {
         }
         Err(e) => {
             eprintln!("[overlay] Failed to start sidecar: {}", e);
-            Err(e.to_string())
+            Err(msg("ov.startFailed", serde_json::json!({"e": e.to_string()})))
         }
     }
 }
@@ -141,7 +142,7 @@ fn spawn_sidecar(_config: OverlayConfig) -> Result<(), String> {
     }
 
     if !sidecar_path.exists() {
-        return Err("Failed to obtain sidecar after download attempt".to_string());
+        return Err(code("ov.sidecarObtain"));
     }
 
     println!("[overlay] Starting sidecar process...");
@@ -159,7 +160,7 @@ fn spawn_sidecar(_config: OverlayConfig) -> Result<(), String> {
         }
         Err(e) => {
             eprintln!("[overlay] Failed to start sidecar: {}", e);
-            Err(e.to_string())
+            Err(msg("ov.startFailed", serde_json::json!({"e": e.to_string()})))
         }
     }
 }
@@ -229,7 +230,7 @@ pub fn position_overlay_by_anchor(app: &AppHandle, w_logical: Option<f64>, h_log
     use tauri::{Manager, PhysicalPosition};
     let window = app
         .get_webview_window("overlay")
-        .ok_or_else(|| "overlay window not found".to_string())?;
+        .ok_or_else(|| code("ov.windowMissing"))?;
     let (lw, lh) = match (w_logical, h_logical) {
         (Some(w), Some(h)) => (w, h),
         _ => {
@@ -268,7 +269,7 @@ pub fn show_overlay_window(app: &AppHandle) -> Result<(), String> {
     use tauri::Manager;
     let window = app
         .get_webview_window("overlay")
-        .ok_or_else(|| "overlay window not found".to_string())?;
+        .ok_or_else(|| code("ov.windowMissing"))?;
     let _ = position_overlay_by_anchor(app, None, None);
     reveal_overlay_no_activate(&window);
     Ok(())
@@ -319,7 +320,7 @@ pub fn toggle_overlay_window(app: &AppHandle) -> Result<bool, String> {
     use tauri::Manager;
     let window = app
         .get_webview_window("overlay")
-        .ok_or_else(|| "overlay window not found".to_string())?;
+        .ok_or_else(|| code("ov.windowMissing"))?;
     // Décision sur la visibilité RÉELLE du HWND, pas sur l'état interne de tao.
     if hwnd_visible(&window) {
         hide_overlay_window(app)?;
@@ -579,11 +580,11 @@ fn lookup_client() -> Result<&'static reqwest::Client, String> {
     let c = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(25))
         .build()
-        .map_err(|e| format!("client HTTP : {e}"))?;
+        .map_err(|e| msg("ov.clientHttp", serde_json::json!({"e": e.to_string()})))?;
     let _ = LOOKUP_CLIENT.set(c);
     LOOKUP_CLIENT
         .get()
-        .ok_or_else(|| "client HTTP indisponible".to_string())
+        .ok_or_else(|| code("ov.clientUnavailable"))
 }
 
 /// One-shot capture + OCR + price lookup, handed to the Python sidecar.
@@ -657,16 +658,16 @@ pub async fn lookup_once(
         .json(&body)
         .send()
         .await
-        .map_err(|e| format!("sidecar injoignable : {e}"))?;
+        .map_err(|e| msg("ov.sidecarDown", serde_json::json!({"e": e.to_string()})))?;
 
     if !response.status().is_success() {
-        return Err(format!("le sidecar a répondu {}", response.status()));
+        return Err(msg("ov.sidecarStatus", serde_json::json!({"status": response.status().to_string()})));
     }
 
     response
         .json::<serde_json::Value>()
         .await
-        .map_err(|e| format!("réponse illisible : {e}"))
+        .map_err(|e| msg("ov.unreadable", serde_json::json!({"e": e.to_string()})))
 }
 
 /// Download the latest release of tarkov-server from GitHub
@@ -678,16 +679,16 @@ pub fn download_latest_sidecar() -> Result<(), String> {
     let client = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(60))
         .build()
-        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+        .map_err(|e| msg("ov.clientHttp", serde_json::json!({"e": e.to_string()})))?;
 
     let release_json: serde_json::Value = client
         .get("https://api.github.com/repos/pado8/tarkov-price-overlay-releases/releases/latest")
         .header("User-Agent", "KappaBuddy/1.0")
         .header("Accept", "application/vnd.github.v3+json")
         .send()
-        .map_err(|e| format!("Failed to fetch release info: {}", e))?
+        .map_err(|e| msg("ov.releaseInfo", serde_json::json!({"e": e.to_string()})))?
         .json()
-        .map_err(|e| format!("Failed to parse release info: {}", e))?;
+        .map_err(|e| msg("ov.releaseParse", serde_json::json!({"e": e.to_string()})))?;
 
     let release_tag = release_json["tag_name"].as_str().unwrap_or("unknown");
     println!("[overlay] Found release tag: {}", release_tag);
@@ -695,7 +696,7 @@ pub fn download_latest_sidecar() -> Result<(), String> {
     let assets = if let Some(arr) = release_json["assets"].as_array() {
         arr
     } else {
-        return Err("No assets found in release".to_string());
+        return Err(code("ov.releaseAssets"));
     };
 
     println!("[overlay] Found {} assets in release", assets.len());
@@ -716,12 +717,12 @@ pub fn download_latest_sidecar() -> Result<(), String> {
             for a in assets.iter().take(10) {
                 println!("[overlay] Asset: {}", a["name"].as_str().unwrap_or("unknown"));
             }
-            return Err("No portable zip asset found in latest release".to_string());
+            return Err(code("ov.releaseZip"));
         }
     };
 
     let temp_dir = std::env::temp_dir().join("tarkov-overlay-download");
-    std::fs::create_dir_all(&temp_dir).map_err(|e| format!("Failed to create temp dir: {}", e))?;
+    std::fs::create_dir_all(&temp_dir).map_err(|e| msg("ov.tempDir", serde_json::json!({"e": e.to_string()})))?;
     let zip_path = temp_dir.join("overlay.zip");
 
     println!("[overlay] Starting download from: {}", download_url);
@@ -730,19 +731,19 @@ pub fn download_latest_sidecar() -> Result<(), String> {
         .get(&download_url)
         .header("User-Agent", "KappaBuddy/1.0")
         .send()
-        .map_err(|e| format!("Failed to start download: {}", e))?;
+        .map_err(|e| msg("ov.downloadStart", serde_json::json!({"e": e.to_string()})))?;
 
     if !response.status().is_success() {
-        return Err(format!("Download failed with status: {}", response.status()));
+        return Err(msg("ov.downloadStatus", serde_json::json!({"status": response.status().to_string()})));
     }
 
     println!("[overlay] Download started...");
-    let content = response.bytes().map_err(|e| format!("Failed to read asset content: {}", e))?;
+    let content = response.bytes().map_err(|e| msg("ov.downloadRead", serde_json::json!({"e": e.to_string()})))?;
     println!("[overlay] Download complete, size: {} bytes", content.len());
 
-    let mut file = std::fs::File::create(&zip_path).map_err(|e| format!("Failed to create temp file: {}", e))?;
-    file.write_all(&content).map_err(|e| format!("Failed to write content: {}", e))?;
-    file.flush().map_err(|e| format!("Failed to flush file: {}", e))?;
+    let mut file = std::fs::File::create(&zip_path).map_err(|e| msg("ov.fileWrite", serde_json::json!({"e": e.to_string()})))?;
+    file.write_all(&content).map_err(|e| msg("ov.fileWrite", serde_json::json!({"e": e.to_string()})))?;
+    file.flush().map_err(|e| msg("ov.fileWrite", serde_json::json!({"e": e.to_string()})))?;
     drop(file);
 
     let exe_dir = std::env::current_exe().map_err(|e| e.to_string())?;
@@ -759,11 +760,11 @@ pub fn download_latest_sidecar() -> Result<(), String> {
     let ps_result = Command::new("powershell")
         .args(&["-Command", &format!("Expand-Archive -Path '{}' -DestinationPath '{}' -Force", zip_path.display(), extract_dir.display())])
         .output()
-        .map_err(|e| format!("Failed to run PowerShell extract: {}", e))?;
+        .map_err(|e| msg("ov.extractRun", serde_json::json!({"e": e.to_string()})))?;
 
     if !ps_result.status.success() {
         let stderr = String::from_utf8_lossy(&ps_result.stderr);
-        return Err(format!("PowerShell extraction failed: {}", stderr));
+        return Err(msg("ov.extractFailed", serde_json::json!({"err": stderr.trim().to_string()})));
     }
 
     println!("[overlay] Extraction complete");
@@ -772,7 +773,7 @@ pub fn download_latest_sidecar() -> Result<(), String> {
     let found = find_sidecar_exe(&extract_dir);
     if let Some(exe_path) = found {
         println!("[overlay] Found sidecar at: {}", exe_path.display());
-        std::fs::copy(&exe_path, &sidecar_path).map_err(|e| format!("Failed to copy sidecar: {}", e))?;
+        std::fs::copy(&exe_path, &sidecar_path).map_err(|e| msg("ov.copyExe", serde_json::json!({"e": e.to_string()})))?;
         
         // Copy the _internal folder if it exists alongside the exe
         let exe_parent = exe_path.parent().unwrap_or(&extract_dir);
@@ -784,13 +785,13 @@ pub fn download_latest_sidecar() -> Result<(), String> {
                 std::fs::remove_dir_all(&dest_internal).ok();
             }
             copy_dir_recursive(&source_internal, &dest_internal)
-                .map_err(|e| format!("Failed to copy _internal folder: {}", e))?;
+                .map_err(|e| msg("ov.copyInternal", serde_json::json!({"e": e.to_string()})))?;
             println!("[overlay] Copied _internal folder to: {}", dest_internal.display());
         }
     } else {
         println!("[overlay] Could not find tarkov-server.exe in archive. Listing contents:");
         list_dir_recursive(&extract_dir, 0, 20);
-        return Err("tarkov-server.exe not found in extracted archive".to_string());
+        return Err(code("ov.archiveExeMissing"));
     }
 
     std::fs::remove_dir_all(&temp_dir).ok();
@@ -933,7 +934,7 @@ pub fn resize_overlay_window(app: &AppHandle, width: f64, height: f64) -> Result
     use tauri::{LogicalSize, Manager};
     let window = app
         .get_webview_window("overlay")
-        .ok_or_else(|| "overlay window not found".to_string())?;
+        .ok_or_else(|| code("ov.windowMissing"))?;
     // Ne jamais redimensionner une fenêtre cachée : sur Windows, set_size peut
     // la réafficher, ce qui laissait un rectangle vide après l'auto-masquage.
     if !hwnd_visible(&window) {

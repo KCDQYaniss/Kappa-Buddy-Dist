@@ -273,6 +273,28 @@ body {
     "o.autoOn": ["Mode auto : activé", "Auto mode: on", "Авто-режим: вкл"],
     "o.autoOff": ["Mode auto : désactivé", "Auto mode: off", "Авто-режим: выкл"],
     "o.startTarkov": ["Lance Tarkov d'abord", "Start Tarkov first", "Сначала запустите Tarkov"],
+    /* Messages codés du backend (status « error ») : rtO les résout, un code
+       inconnu retombe sur le générique traduit « o.readError ». */
+    "ov.clientHttp": ["Client HTTP : {e}", "HTTP client: {e}", "HTTP-клиент: {e}"],
+    "ov.sidecarDown": ["Sidecar injoignable : {e}", "Sidecar unreachable: {e}", "Sidecar недоступен: {e}"],
+    "ov.sidecarStatus": ["Le sidecar a répondu {status}", "The sidecar answered {status}", "Sidecar ответил {status}"],
+    "ov.unreadable": ["Réponse illisible : {e}", "Unreadable response: {e}", "Ответ не читается: {e}"],
+    "ov.sidecarObtain": ["Sidecar introuvable après tentative de téléchargement", "Sidecar not available after the download attempt", "Sidecar не найден после попытки загрузки"],
+    "ov.startFailed": ["Démarrage du sidecar impossible : {e}", "Cannot start the sidecar: {e}", "Не удалось запустить sidecar: {e}"],
+    "ov.releaseInfo": ["Lecture des infos de version impossible : {e}", "Cannot read release info: {e}", "Не удалось прочитать данные версии: {e}"],
+    "ov.releaseParse": ["Réponse de version illisible : {e}", "Unreadable release response: {e}", "Ответ о версии не читается: {e}"],
+    "ov.releaseAssets": ["Aucun fichier dans la dernière version", "No assets in the latest release", "В последней версии нет файлов"],
+    "ov.releaseZip": ["Aucun zip portable dans la dernière version", "No portable zip in the latest release", "В последней версии нет переносимого zip"],
+    "ov.tempDir": ["Création du dossier temporaire : {e}", "Temp folder creation: {e}", "Создание временной папки: {e}"],
+    "ov.downloadStart": ["Démarrage du téléchargement : {e}", "Download start: {e}", "Начало загрузки: {e}"],
+    "ov.downloadStatus": ["Téléchargement refusé ({status})", "Download rejected ({status})", "Загрузка отклонена ({status})"],
+    "ov.downloadRead": ["Lecture du fichier téléchargé : {e}", "Reading the downloaded file: {e}", "Чтение загруженного файла: {e}"],
+    "ov.fileWrite": ["Écriture du fichier temporaire : {e}", "Temp file write: {e}", "Запись временного файла: {e}"],
+    "ov.extractRun": ["Extraction PowerShell : {e}", "PowerShell extraction: {e}", "Распаковка PowerShell: {e}"],
+    "ov.extractFailed": ["L'extraction PowerShell a échoué : {err}", "PowerShell extraction failed: {err}", "Распаковка PowerShell не удалась: {err}"],
+    "ov.copyExe": ["Copie du sidecar : {e}", "Sidecar copy: {e}", "Копирование sidecar: {e}"],
+    "ov.copyInternal": ["Copie du dossier _internal : {e}", "_internal folder copy: {e}", "Копирование папки _internal: {e}"],
+    "ov.archiveExeMissing": ["tarkov-server.exe absent de l'archive extraite", "tarkov-server.exe missing from the extracted archive", "В распакованном архиве нет tarkov-server.exe"],
   };
   let oLang = "fr";
   function t(k, p) {
@@ -290,6 +312,22 @@ body {
     // Titre en état neutre uniquement : ne jamais écraser un nom d'objet réel.
     const name = $("overlay-name");
     if (name.classList.contains("placeholder")) name.textContent = t("o.placeholder");
+  }
+
+  /** Résout un message codé du backend (« code » ou « code {json} »). Un code
+      inconnu ici retombe sur le générique traduit : la carte n'affiche jamais
+      un code brut. Les textes libres (sidecar externe) passent inchangés. */
+  function rtO(value) {
+    if (value == null) return "";
+    const text = String(value);
+    const m = /^([a-zA-Z][\w.]*)(?: (\{.*\}))?$/.exec(text);
+    if (!m || !STR[m[1]]) return t("o.readError");
+    let p = {};
+    if (m[2]) {
+      try { p = JSON.parse(m[2]); } catch (_) { return t("o.readError"); }
+      if (!p || typeof p !== "object" || Array.isArray(p)) return t("o.readError");
+    }
+    return t(m[1], p);
   }
 
   function fitWindow() {
@@ -596,7 +634,7 @@ body {
       } else if (status === "hide") {
         forceHide();
       } else if (status === "error") {
-        showError(data.message || t("o.readError"), data.autohide);
+        showError(rtO(data.message), data.autohide);
       } else if (status === "not-in-game") {
         showError(t("o.startTarkov"), data.autohide || 4);
       }

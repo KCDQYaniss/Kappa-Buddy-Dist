@@ -412,6 +412,115 @@
     "diag.copied": ["Diagnostic copié dans le presse-papiers.", "Diagnostics copied to clipboard.", "Diagnose in die Zwischenablage kopiert.", "Diagnóstico copiado al portapapeles.", "Диагностика скопирована в буфер обмена."],
     "diag.selectManually": ["Sélectionné : fais Ctrl+C pour copier.", "Selected: press Ctrl+C to copy.", "Ausgewählt: Ctrl+C zum Kopieren.", "Seleccionado: pulsa Ctrl+C para copiar.", "Выделено: нажмите Ctrl+C."],
 
+    /* ---------- Rust : codes et paramètres JSON, résolus par rt() ---------- */
+    "diag.srcManual": ["réglage manuel", "manual setting", "manuelle Einstellung", "ajuste manual", "задано вручную"],
+    "diag.srcAuto": ["détection automatique", "automatic detection", "automatische Erkennung", "detección automática", "автоопределение"],
+    "diag.srcManualMissing": ["réglage manuel (introuvable)", "manual setting (missing)", "manuelle Einstellung (fehlt)", "ajuste manual (no existe)", "задано вручную (не найдено)"],
+    "diag.path": ["{path} : {state}", "{path}: {state}", "{path}: {state}", "{path}: {state}", "{path}: {state}"],
+    "diag.r.manualMissing": ["Le dossier de logs indiqué n'existe pas : {path}", "The configured logs folder does not exist: {path}", "Der angegebene Logs-Ordner existiert nicht: {path}", "La carpeta de registros indicada no existe: {path}", "Указанная папка логов не существует: {path}"],
+    "diag.r.manualMissing.detail": ["Réglages → « Dossier des logs du jeu » pointe vers un dossier absent.", "Settings → “Game logs folder” points to a missing folder.", "Einstellungen → „Logs-Ordner des Spiels“ zeigt auf einen fehlenden Ordner.", "Ajustes → «Carpeta de registros del juego» apunta a una carpeta inexistente.", "Настройки → «Папка логов игры» указывает на несуществующую папку."],
+    "diag.r.manualMissing.fix": ["Corrige le chemin, ou vide le champ pour laisser la détection automatique.", "Fix the path, or clear the field to use automatic detection.", "Korrigiere den Pfad oder leere das Feld für die automatische Erkennung.", "Corrige la ruta o vacía el campo para usar la detección automática.", "Исправьте путь или очистите поле для автоопределения."],
+    "diag.r.screenshotsMissing": ["Le dossier de captures n'existe pas", "The screenshots folder does not exist", "Der Screenshots-Ordner existiert nicht", "La carpeta de capturas no existe", "Папки скриншотов не существует"],
+    "diag.r.screenshotEmpty": ["Aucune capture d'écran dans le dossier", "No screenshots in the folder", "Keine Screenshots im Ordner", "Sin capturas de pantalla en la carpeta", "Нет скриншотов в папке"],
+    "diag.r.screenshotOld": ["Aucune capture d'écran récente", "No recent screenshot", "Kein aktueller Screenshot", "Ninguna captura reciente", "Нет свежих скриншотов"],
+    "diag.r.logsMissing": ["Dossier de logs introuvable", "Logs folder not found", "Logs-Ordner nicht gefunden", "Carpeta de registros no encontrada", "Папка логов не найдена"],
+    "diag.r.logsNoSessions": ["Ce dossier ne contient aucune session « log_… »", "This folder has no “log_…” session", "Dieser Ordner enthält keine „log_…“-Session", "Esta carpeta no contiene ninguna sesión «log_…»", "В этой папке нет сессий «log_…»"],
+    "diag.r.logsNoAppLog": ["Aucun fichier « application.log » dans la dernière session", "No « application.log » in the latest session", "Keine « application.log » in der letzten Sitzung", "No hay « application.log » en la última sesión", "Нет « application.log » в последней сессии"],
+    "diag.r.noMapLine": ["Le log ne contient aucune ligne de map", "Log contains no map line", "Log enthält keine Kartenzeile", "El registro no contiene líneas de mapa", "В логе нет строк карты"],
+    "diag.r.unknownMap": ["Map « {raw} » trouvée mais non reconnue", "Map « {raw} » found but not recognized", "Karte « {raw} » gefunden, aber nicht erkannt", "Mapa « {raw} » encontrado pero no reconocido", "Карта « {raw} » найдена, но не распознана"],
+    "diag.r.notifEmpty": ["Aucun fichier de notifications dans la dernière session", "No notification files in latest session", "Keine Benachrichtigungsdateien in der letzten Sitzung", "No hay archivos de notificaciones en la última sesión", "В последней сессии нет файлов уведомлений"],
+    "diag.r.noQuestEvents": ["Aucun évènement de quête lu dans la dernière session", "No quest event read in the latest session", "Kein Auftragsereignis in der letzten Session gelesen", "Ningún evento de misión leído en la última sesión", "В последней сессии нет событий заданий"],
+    "diag.r.staleSession": ["La dernière session de logs date d'il y a plus d'un jour", "The latest log session is more than a day old", "Die letzte Log-Session ist älter als ein Tag", "La última sesión de registros tiene más de un día", "Последняя сессия логов старше суток"],
+    "diag.r.okLogs": ["Tout semble en ordre côté logs.", "Everything looks fine on the logs side.", "Alles ist mit den Logs in Ordnung.", "Todo parece correcto en los registros.", "Всё в порядке с логами."],
+    "diag.r.okLogs.detail": ["Logs, map et quêtes sont lisibles : la détection fonctionne.", "Logs, map and quests are readable: detection works.", "Logs, Karte und Aufträge sind lesbar: Die Erkennung funktioniert.", "Registros, mapa y misiones son legibles: la detección funciona.", "Логи, карта и задания читаются: обнаружение работает."],
+    "diag.r.logsMissing.detail": ["Aucun emplacement connu ne contient de logs ({n} vérifiés).", "No known location contains logs ({n} checked).", "Kein bekannter Ort enthält Logs ({n} geprüft).", "Ninguna ubicación conocida contiene registros ({n} comprobadas).", "Ни одно известное место не содержит логов (проверено: {n})."],
+    "diag.r.logsMissing.fix": ["Cherche le dossier « Logs » dans l'installation du jeu (Steam : …\\Escape from Tarkov\\build\\Logs) et colle son chemin dans Réglages.", "Find the “Logs” folder in the game installation (Steam: …\\Escape from Tarkov\\build\\Logs) and paste its path in Settings.", "Suche den „Logs“-Ordner im Spielverzeichnis (Steam: …\\Escape from Tarkov\\build\\Logs) und füge den Pfad in den Einstellungen ein.", "Busca la carpeta «Logs» en la instalación (Steam: …\\Escape from Tarkov\\build\\Logs) y pega su ruta en Ajustes.", "Найдите папку «Logs» в папке игры (Steam: …\\Escape from Tarkov\\build\\Logs) и вставьте путь в настройках."],
+    "diag.r.logsNoSessions.detail": ["Le dossier {dir} n'a pas la structure des logs du jeu.", "The folder {dir} does not have the game's log structure.", "Der Ordner {dir} hat nicht die Log-Struktur des Spiels.", "La carpeta {dir} no tiene la estructura de registros del juego.", "Папка {dir} не имеет структуры логов игры."],
+    "diag.r.logsNoSessions.fix": ["Ce n'est probablement pas le bon dossier. Vise le dossier « Logs » du jeu (Steam : …\\Escape from Tarkov\\build\\Logs).", "This is probably the wrong folder. Use the game's “Logs” folder (Steam: …\\Escape from Tarkov\\build\\Logs).", "Das ist wahrscheinlich der falsche Ordner. Nimm den „Logs“-Ordner des Spiels (Steam: …\\Escape from Tarkov\\build\\Logs).", "Probablemente es la carpeta incorrecta. Usa «Logs» del juego (Steam: …\\Escape from Tarkov\\build\\Logs).", "Скорее всего, это не та папка. Нужна папка «Logs» игры (Steam: …\\Escape from Tarkov\\build\\Logs)."],
+    "diag.r.logsNoAppLog.detail": ["Session {session} : aucun fichier d'application trouvé.", "Session {session}: no application log found.", "Session {session}: kein Anwendungslog gefunden.", "Sesión {session}: no se encontró el registro de aplicación.", "Сессия {session}: лог приложения не найден."],
+    "diag.r.logsNoAppLog.fix": ["Lance une partie (au moins jusqu'au chargement du raid) puis relance ce diagnostic.", "Start a raid (at least to map loading), then run this diagnostic again.", "Starte eine Runde (mindestens bis zum Laden der Karte) und führe die Diagnose erneut aus.", "Inicia una partida (al menos hasta la carga del mapa) y repite el diagnóstico.", "Запустите рейд (хотя бы до загрузки карты) и повторите диагностику."],
+    "diag.r.noMapLine.detail": ["Le fichier est lisible mais aucune ligne « Location: » n'y a été trouvée.", "The file is readable but contains no “Location:” line.", "Die Datei ist lesbar, enthält aber keine „Location:“-Zeile.", "El archivo es legible pero no contiene líneas «Location:».", "Файл читается, но строк «Location:» в нём нет."],
+    "diag.r.noMapLine.fix": ["Lance une partie jusqu'au chargement du raid, prends une capture d'écran, puis relance ce diagnostic.", "Play until the raid loads, take a screenshot, then run this diagnostic again.", "Spiele bis zum Laden der Karte, mache einen Screenshot und wiederhole die Diagnose.", "Juega hasta la carga del mapa, haz una captura y repite el diagnóstico.", "Дождитесь загрузки рейда, сделайте скриншот и повторите диагностику."],
+    "diag.r.unknownMap.detail": ["Le nom de la carte dans le log ne correspond à aucune carte connue.", "The map name in the log matches no known map.", "Der Kartenname im Log passt zu keiner bekannten Karte.", "El nombre del mapa en el registro no coincide con ningún mapa conocido.", "Название карты в логе не совпадает ни с одной известной картой."],
+    "diag.r.unknownMap.fix": ["Signale-le : la correspondance sera ajoutée dans une prochaine version.", "Report it: the mapping will be added in a future version.", "Melde es: Die Zuordnung kommt in einer künftigen Version.", "Repórtalo: la correspondencia se añadirá en una próxima versión.", "Сообщите об этом: соответствие добавят в следующей версии."],
+    "diag.r.notifEmpty.detail": ["Sans lui, les quêtes démarrées ou terminées en jeu ne peuvent pas être détectées.", "Without it, quests started or finished in game cannot be detected.", "Ohne sie können im Spiel gestartete oder abgeschlossene Aufträge nicht erkannt werden.", "Sin él no se pueden detectar misiones iniciadas o terminadas en el juego.", "Без него невозможно обнаружить задания, начатые или завершённые в игре."],
+    "diag.r.notifEmpty.fix": ["Vérifie le dossier des logs, puis lance une partie et relance ce diagnostic.", "Check the logs folder, play a raid and run this diagnostic again.", "Prüfe den Logs-Ordner, spiele eine Runde und wiederhole die Diagnose.", "Comprueba la carpeta de registros, juega una partida y repite el diagnóstico.", "Проверьте папку логов, сыграйте рейд и повторите диагностику."],
+    "diag.r.noQuestEvents.detail": ["{n} fichier(s) de notifications lu(s), aucun message de quête reconnu.", "{n} notification file(s) read, no quest message recognized.", "{n} Benachrichtigungsdatei(en) gelesen, keine Auftragsmeldung erkannt.", "{n} archivo(s) de notificaciones leído(s), ningún mensaje de misión reconocido.", "Прочитано файлов уведомлений: {n}, сообщений заданий не распознано."],
+    "diag.r.noQuestEvents.fix": ["C'est normal si tu n'as pas démarré ni terminé de quête dans cette partie. Sinon, copie les détails ci-dessous dans un rapport.", "This is normal if you started or finished no quest in that raid. Otherwise, copy the details below into a report.", "Das ist normal, wenn du keinen Auftrag gestartet oder abgeschlossen hast. Sonst kopiere die Details unten in einen Bericht.", "Es normal si no iniciaste ni terminaste misiones. Si no, copia los detalles de abajo en un informe.", "Это нормально, если вы не начинали и не завершали задания. Иначе скопируйте подробности ниже в отчёт."],
+    "diag.r.staleSession.detail": ["Fichiers modifiés il y a {h} h.", "Files last modified {h} h ago.", "Dateien zuletzt vor {h} h geändert.", "Archivos modificados hace {h} h.", "Файлы изменены {h} ч назад."],
+    "diag.r.staleSession.fix": ["Le suivi en direct reprendra dès que le jeu écrira dans un nouveau log.", "Live tracking resumes when the game writes a new log.", "Die Live-Verfolgung wird fortgesetzt, sobald das Spiel ein neues Log schreibt.", "El seguimiento se reanudará cuando el juego escriba un nuevo registro.", "Отслеживание продолжится, как только игра запишет новый лог."],
+    "diag.r.screenshotsMissing.detail": ["{dir} est absent.", "{dir} is missing.", "{dir} fehlt.", "Falta {dir}.", "{dir} отсутствует."],
+    "diag.r.screenshotsMissing.fix": ["Sans captures, la position sur la carte ne peut pas être suivie. Le jeu crée le dossier à la première capture ; prends-en une en jeu.", "Without screenshots, your map position cannot be tracked. The game creates the folder on the first screenshot; take one in game.", "Ohne Screenshots kann die Kartenposition nicht verfolgt werden. Das Spiel erstellt den Ordner bei der ersten Aufnahme; mache eine im Spiel.", "Sin capturas no se puede seguir la posición. El juego crea la carpeta en la primera captura; haz una en el juego.", "Без скриншотов нельзя отслеживать позицию. Игра создаёт папку при первом скриншоте; сделайте скриншот в игре."],
+    "diag.r.screenshotOld.detail": ["La plus récente ({name}) date de {days} jours.", "The most recent ({name}) is {days} days old.", "Die letzte ({name}) ist {days} Tage alt.", "La más reciente ({name}) tiene {days} días.", "Самый свежий ({name}) — {days} дн. назад."],
+    "diag.r.screenshotOld.fix": ["Prends une capture en jeu avec la touche dédiée : la position se mettra à jour.", "Take a screenshot in game with the dedicated key: your position will update.", "Mache im Spiel einen Screenshot: Die Position wird aktualisiert.", "Haz una captura en el juego: la posición se actualizará.", "Сделайте скриншот в игре: позиция обновится."],
+    "diag.r.screenshotEmpty.detail": ["{dir} est vide.", "{dir} is empty.", "{dir} ist leer.", "{dir} está vacía.", "Папка {dir} пуста."],
+    "diag.r.screenshotEmpty.fix": ["Prends une capture en jeu avec la touche dédiée : la position se mettra à jour.", "Take a screenshot in game with the dedicated key: your position will update.", "Mache im Spiel einen Screenshot: Die Position wird aktualisiert.", "Haz una captura en el juego: la posición se actualizará.", "Сделайте скриншот в игре: позиция обновится."],
+
+    "w.screenshotsWatch": ["Surveillance des screenshots impossible : {e}", "Cannot watch the screenshots folder: {e}", "Screenshots-Ordner kann nicht überwacht werden: {e}", "No se puede vigilar la carpeta de capturas: {e}", "Невозможно следить за папкой скриншотов: {e}"],
+    "w.screenshotsWatcher": ["Module de surveillance des screenshots : {e}", "Screenshots watcher: {e}", "Screenshot-Überwachung: {e}", "Vigilancia de capturas: {e}", "Наблюдение за скриншотами: {e}"],
+    "w.screenshotsDir": ["Dossier de screenshots introuvable : {dir} (il est créé par le jeu à la première capture)", "Screenshots folder not found: {dir} (the game creates it on the first screenshot)", "Screenshots-Ordner nicht gefunden: {dir} (das Spiel erstellt ihn bei der ersten Aufnahme)", "Carpeta de capturas no encontrada: {dir} (el juego la crea en la primera captura)", "Папка скриншотов не найдена: {dir} (игра создаёт её при первом скриншоте)"],
+    "w.logsWatch": ["Surveillance des logs impossible : {e}", "Cannot watch the logs folder: {e}", "Logs-Ordner kann nicht überwacht werden: {e}", "No se puede vigilar la carpeta de registros: {e}", "Невозможно следить за папкой логов: {e}"],
+    "w.logsWatcher": ["Module de surveillance des logs : {e}", "Logs watcher: {e}", "Log-Überwachung: {e}", "Vigilancia de registros: {e}", "Наблюдение за логами: {e}"],
+    "w.logsDir": ["Dossier de logs introuvable : renseigne-le dans Réglages (le diagnostic t'indique où chercher).", "Logs folder not found: set it in Settings (diagnostics tells you where to look).", "Logs-Ordner nicht gefunden: bitte in den Einstellungen angeben (die Diagnose hilft bei der Suche).", "Carpeta de registros no encontrada: indícala en Ajustes (el diagnóstico te dice dónde buscar).", "Папка логов не найдена: укажите её в настройках (диагностика подскажет, где искать)."],
+
+    "err.noScreenshots": ["Aucune capture d'écran trouvée dans le dossier configuré.", "No screenshot found in the configured folder.", "Kein Screenshot im konfigurierten Ordner gefunden.", "No se encontró ninguna captura en la carpeta configurada.", "В настроенной папке не найдено ни одного скриншота."],
+    "err.fileMissing": ["Fichier introuvable : {file}", "File not found: {file}", "Datei nicht gefunden: {file}", "Archivo no encontrado: {file}", "Файл не найден: {file}"],
+    "err.noUpdate": ["Aucune mise à jour disponible.", "No update available.", "Keine Aktualisierung verfügbar.", "No hay ninguna actualización disponible.", "Доступных обновлений нет."],
+    "err.updateInsecure": ["Adresse de mise à jour non sécurisée.", "Insecure update address.", "Unsichere Update-Adresse.", "Dirección de actualización no segura.", "Небезопасный адрес обновления."],
+    "err.updateMissing": ["Adresse de mise à jour introuvable.", "Update address not found.", "Update-Adresse nicht gefunden.", "Dirección de actualización no encontrada.", "Адрес обновления не найден."],
+    "err.updateUnexpected": ["Adresse de mise à jour inattendue.", "Unexpected update address.", "Unerwartete Update-Adresse.", "Dirección de actualización inesperada.", "Неожиданный адрес обновления."],
+    "err.powershell": ["Impossible de lancer PowerShell : {e}", "Cannot start PowerShell: {e}", "PowerShell lässt sich nicht starten: {e}", "No se puede iniciar PowerShell: {e}", "Не удалось запустить PowerShell: {e}"],
+    "err.ocrFailed": ["L'OCR n'a retourné aucun texte : {e}", "OCR returned no text: {e}", "OCR hat keinen Text zurückgegeben: {e}", "El OCR no devolvió texto: {e}", "OCR не вернул текст: {e}"],
+    "err.ocrUnavailable": ["OCR Windows indisponible : installe une langue puis son module de reconnaissance (Paramètres > Heure & langue > Langue).", "Windows OCR unavailable: install a language and its recognition module (Settings > Time & language > Language).", "Windows-OCR nicht verfügbar: installiere eine Sprache mit Texterkennung (Einstellungen > Zeit und Sprache > Sprache).", "OCR de Windows no disponible: instala un idioma con reconocimiento (Configuración > Hora e idioma > Idioma).", "OCR Windows недоступен: установите язык с модулем распознавания (Параметры > Время и язык > Язык)."],
+    "err.hotkeyBad": ["Raccourci {what} « {combo} » invalide : {e}", "Invalid {what} hotkey “{combo}”: {e}", "Ungültige {what}-Tastenkombination „{combo}“: {e}", "Combinación {what} «{combo}» no válida: {e}", "Неверная комбинация {what} «{combo}»: {e}"],
+    "err.hotkeyRegister": ["Impossible d'enregistrer le raccourci {what} « {combo} » : {e}", "Cannot register the {what} hotkey “{combo}”: {e}", "{what}-Tastenkombination „{combo}“ lässt sich nicht registrieren: {e}", "No se puede registrar la combinación {what} «{combo}»: {e}", "Не удалось зарегистрировать комбинацию {what} «{combo}»: {e}"],
+    "hk.capture": ["de capture", "capture", "Aufnahme", "captura", "захвата"],
+    "hk.toggle": ["d'affichage", "display", "Anzeige", "visualización", "показа"],
+    "hk.auto": ["du mode auto", "auto mode", "Auto-Modus", "modo auto", "авто-режима"],
+    "hk.hide": ["de masquage", "hide", "Ausblenden", "ocultar", "скрытия"],
+
+    "data.badLang": ["Langue invalide", "Invalid language", "Ungültige Sprache", "Idioma no válido", "Недопустимый язык"],
+    "data.progress": ["Téléchargement : {label}…", "Downloading: {label}…", "Download: {label}…", "Descarga: {label}…", "Загрузка: {label}…"],
+    "dl.items": ["objets", "items", "Gegenstände", "objetos", "предметов"],
+    "dl.traders": ["marchands", "traders", "Händler", "comerciantes", "торговцев"],
+    "dl.maps": ["cartes", "maps", "Karten", "mapas", "карт"],
+    "dl.tasks": ["quêtes", "quests", "Aufträge", "misiones", "заданий"],
+    "dl.hideout": ["hideout", "hideout", "Versteck", "refugio", "убежища"],
+    "data.keep": ["{what} : {e}{old}", "{what}: {e}{old}", "{what}: {e}{old}", "{what}: {e}{old}", "{what}: {e}{old}"],
+    "data.oldKept": [" (anciennes données conservées)", " (old data kept)", " (alte Daten behalten)", " (se conservaron los datos antiguos)", " (старые данные сохранены)"],
+    "data.network": ["réseau : {e}", "network: {e}", "Netzwerk: {e}", "red: {e}", "сеть: {e}"],
+    "data.http": ["HTTP {status} : {body}", "HTTP {status}: {body}", "HTTP {status}: {body}", "HTTP {status}: {body}", "HTTP {status}: {body}"],
+    "data.unreadable": ["réponse illisible : {e}", "unreadable response: {e}", "unlesbare Antwort: {e}", "respuesta ilegible: {e}", "ответ не читается: {e}"],
+    "data.downloadFailed": ["Téléchargement impossible : {path} ({reason})", "Download failed: {path} ({reason})", "Download fehlgeschlagen: {path} ({reason})", "Descarga fallida: {path} ({reason})", "Не удалось загрузить: {path} ({reason})"],
+    "data.retries": ["{path} : trop d'échecs", "{path}: too many failures", "{path}: zu viele Fehlversuche", "{path}: demasiados fallos", "{path}: слишком много неудач"],
+    "data.fallbackEn": ["{reason} ; repli sur l'anglais : {en}", "{reason}; falling back to English: {en}", "{reason}; Rückfall auf Englisch: {en}", "{reason}; se usará el inglés: {en}", "{reason}; откат на английский: {en}"],
+    "data.dependsMaps": ["dépend des cartes, qui n'ont pas pu être téléchargées", "depends on maps, which could not be downloaded", "hängt von den Karten ab, die nicht geladen werden konnten", "depende de los mapas, que no se pudieron descargar", "зависит от карт, которые не удалось загрузить"],
+    "data.cacheWrite": ["Écriture du cache : {e}", "Cache write: {e}", "Cache schreiben: {e}", "Escritura de la caché: {e}", "Запись кэша: {e}"],
+    "data.badJson": ["JSON invalide : {e}", "Invalid JSON: {e}", "Ungültiges JSON: {e}", "JSON no válido: {e}", "Неверный JSON: {e}"],
+
+    "ov.clientHttp": ["Client HTTP : {e}", "HTTP client: {e}", "HTTP-Client: {e}", "Cliente HTTP: {e}", "HTTP-клиент: {e}"],
+    "ov.clientUnavailable": ["Client HTTP indisponible", "HTTP client unavailable", "HTTP-Client nicht verfügbar", "Cliente HTTP no disponible", "HTTP-клиент недоступен"],
+    "ov.sidecarDown": ["Sidecar injoignable : {e}", "Sidecar unreachable: {e}", "Sidecar nicht erreichbar: {e}", "Sidecar inaccesible: {e}", "Sidecar недоступен: {e}"],
+    "ov.sidecarStatus": ["Le sidecar a répondu {status}", "The sidecar answered {status}", "Der Sidecar antwortete {status}", "El sidecar respondió {status}", "Sidecar ответил {status}"],
+    "ov.unreadable": ["Réponse illisible : {e}", "Unreadable response: {e}", "Unlesbare Antwort: {e}", "Respuesta ilegible: {e}", "Ответ не читается: {e}"],
+    "ov.sidecarObtain": ["Sidecar introuvable après tentative de téléchargement", "Sidecar not available after the download attempt", "Sidecar nach dem Downloadversuch nicht vorhanden", "Sidecar no disponible tras el intento de descarga", "Sidecar не найден после попытки загрузки"],
+    "ov.startFailed": ["Démarrage du sidecar impossible : {e}", "Cannot start the sidecar: {e}", "Sidecar lässt sich nicht starten: {e}", "No se puede iniciar el sidecar: {e}", "Не удалось запустить sidecar: {e}"],
+    "ov.windowMissing": ["Fenêtre overlay introuvable", "Overlay window not found", "Overlay-Fenster nicht gefunden", "Ventana overlay no encontrada", "Окно оверлея не найдено"],
+    "ov.releaseInfo": ["Lecture des infos de version impossible : {e}", "Cannot read release info: {e}", "Release-Infos unlesbar: {e}", "No se pudo leer la información de la versión: {e}", "Не удалось прочитать данные версии: {e}"],
+    "ov.releaseParse": ["Réponse de version illisible : {e}", "Unreadable release response: {e}", "Release-Antwort unlesbar: {e}", "Respuesta de versión ilegible: {e}", "Ответ о версии не читается: {e}"],
+    "ov.releaseAssets": ["Aucun fichier dans la dernière version", "No assets in the latest release", "Keine Dateien in der letzten Version", "Ningún archivo en la última versión", "В последней версии нет файлов"],
+    "ov.releaseZip": ["Aucun zip portable dans la dernière version", "No portable zip in the latest release", "Kein portables Zip in der letzten Version", "Ningún zip portátil en la última versión", "В последней версии нет переносимого zip"],
+    "ov.tempDir": ["Création du dossier temporaire : {e}", "Temp folder creation: {e}", "Temp-Ordner anlegen: {e}", "Creación de la carpeta temporal: {e}", "Создание временной папки: {e}"],
+    "ov.downloadStart": ["Démarrage du téléchargement : {e}", "Download start: {e}", "Download-Start: {e}", "Inicio de la descarga: {e}", "Начало загрузки: {e}"],
+    "ov.downloadStatus": ["Téléchargement refusé ({status})", "Download rejected ({status})", "Download abgelehnt ({status})", "Descarga rechazada ({status})", "Загрузка отклонена ({status})"],
+    "ov.downloadRead": ["Lecture du fichier téléchargé : {e}", "Reading the downloaded file: {e}", "Lesen der geladenen Datei: {e}", "Lectura del archivo descargado: {e}", "Чтение загруженного файла: {e}"],
+    "ov.fileWrite": ["Écriture du fichier temporaire : {e}", "Temp file write: {e}", "Temp-Datei schreiben: {e}", "Escritura del archivo temporal: {e}", "Запись временного файла: {e}"],
+    "ov.extractRun": ["Extraction PowerShell : {e}", "PowerShell extraction: {e}", "PowerShell-Entpacken: {e}", "Extracción con PowerShell: {e}", "Распаковка PowerShell: {e}"],
+    "ov.extractFailed": ["L'extraction PowerShell a échoué : {err}", "PowerShell extraction failed: {err}", "PowerShell-Entpacken fehlgeschlagen: {err}", "Falló la extracción con PowerShell: {err}", "Распаковка PowerShell не удалась: {err}"],
+    "ov.copyExe": ["Copie du sidecar : {e}", "Sidecar copy: {e}", "Sidecar kopieren: {e}", "Copia del sidecar: {e}", "Копирование sidecar: {e}"],
+    "ov.copyInternal": ["Copie du dossier _internal : {e}", "_internal folder copy: {e}", "_internal-Ordner kopieren: {e}", "Copia de la carpeta _internal: {e}", "Копирование папки _internal: {e}"],
+    "ov.archiveExeMissing": ["tarkov-server.exe absent de l'archive extraite", "tarkov-server.exe missing from the extracted archive", "tarkov-server.exe fehlt im entpackten Archiv", "Falta tarkov-server.exe en el archivo extraído", "В распакованном архиве нет tarkov-server.exe"],
+
     /* ---------- Mises à jour ---------- */
     "upd.available": ["Mise à jour {version} disponible — tu as la {current}", "Update {version} available — you have {current}", "Update {version} verfügbar — du hast {current}", "Actualización {version} disponible — tienes la {current}", "Доступно обновление {version} — у вас {current}"],
     "upd.install": ["Installer et redémarrer", "Install and restart", "Installieren und neu starten", "Instalar y reiniciar", "Установить и перезапустить"],
@@ -566,11 +675,38 @@
   let lang = "fr";
   const listeners = new Set();
 
-  function t(key, params) {
-    const row = T[key];
-    let s = row ? (row[IDX[lang]] || row[1] || row[0]) : key;
-    if (params) for (const k of Object.keys(params)) s = s.split("{" + k + "}").join(params[k]);
-    return s;
+  const has = (key) => Object.prototype.hasOwnProperty.call(T, key);
+  function translate(key, params, locale, depth) {
+    const row = has(key) ? T[key] : null;
+    const s = row ? (row[IDX[locale]] || row[1] || row[0]) : key;
+    // Un seul passage : un chemin contenant {e} ou $& ne doit pas être réinterprété.
+    return params ? s.replace(/\{([^{}]+)\}/g, (token, k) =>
+      Object.prototype.hasOwnProperty.call(params, k) ? rt(params[k], locale, depth + 1) : token) : s;
+  }
+  function t(key, params) { return translate(key, params, lang, 0); }
+
+  /** Résout les messages Rust (code seul ou code + JSON compact), sans modifier
+      les anciens textes ni les erreurs externes inconnues. La locale explicite
+      permet à l'overlay fr/en/ru de partager les traductions sans changer l'UI. */
+  function rt(value, locale = lang, depth = 0) {
+    if (value == null) return "";
+    if (depth > 24) return String(value);
+    if (typeof value === "object") {
+      if (typeof value.code === "string" && has(value.code)) {
+        return translate(value.code, value.params, locale, depth);
+      }
+      return String(value.message == null ? value : value.message);
+    }
+    const text = String(value);
+    if (text.includes("\n")) return text.split("\n").map((line) => rt(line, locale, depth + 1)).join("\n");
+    const m = /^([a-zA-Z][\w.]*)(?: (\{.*\}))?$/.exec(text);
+    if (!m || !has(m[1])) return text;
+    let params;
+    if (m[2]) {
+      try { params = JSON.parse(m[2]); } catch (_) { return text; }
+      if (!params || typeof params !== "object" || Array.isArray(params)) return text;
+    }
+    return translate(m[1], params, locale, depth);
   }
 
   /** Remplace les textes marqués dans le HTML. */
@@ -589,7 +725,7 @@
   }
 
   TT.i18n = {
-    t, apply, setLang,
+    t, rt, apply, setLang,
     LANGS,
     current: () => lang,
     onChange: (f) => (listeners.add(f), () => listeners.delete(f)),

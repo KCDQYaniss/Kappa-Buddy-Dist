@@ -137,8 +137,12 @@ async function feed(msg, payload) {
   ok(/Mode auto : activé/.test(text("overlay-name")), "retour visuel mode auto");
   await feed("", { status: "not-in-game", seq: 7, autohide: 4, cfg: DEF_CFG });
   ok(/Lance Tarkov d'abord/.test(text("overlay-name")), "message not-in-game");
-  await feed("", { status: "error", seq: 8, message: "sidecar injoignable : boom", autohide: 8, cfg: DEF_CFG });
-  ok(/sidecar injoignable/.test(text("overlay-name")), "erreur réseau explicite");
+  await feed("", { status: "error", seq: 8, message: 'ov.sidecarDown {"e":"boom"}', autohide: 8, cfg: DEF_CFG });
+  ok(/Sidecar injoignable/.test(text("overlay-name")) && /boom/.test(text("overlay-name")), "erreur codée traduite avec son paramètre");
+  await feed("", { status: "error", seq: 8.1, message: "ov.codeInconnu", autohide: 8, cfg: DEF_CFG });
+  ok(/Erreur de lecture/.test(text("overlay-name")), "code inconnu → message générique traduit");
+  await feed("", { status: "error", seq: 8.2, message: "texte libre externe", autohide: 8, cfg: DEF_CFG });
+  ok(/Erreur de lecture/.test(text("overlay-name")), "texte non codé → message générique traduit");
   await feed("", { status: "hide", seq: 9 });
   ok($("cursor-overlay").classList.contains("hidden"), "status hide → carte masquée");
 

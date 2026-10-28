@@ -9,6 +9,7 @@
   const listen = T ? T.event.listen : async () => () => {};
   const esc = (s) => TT.store.esc(s);
   const t = (k, p) => TT.i18n.t(k, p);
+  const rt = (value) => TT.i18n.rt(value);
   let state = null;
   let lastMapEvent = "";
   const shown = new Set();
@@ -17,7 +18,7 @@
   TT.notify = function (text, kind) {
     const li = document.createElement("li");
     li.className = kind === "warn" ? "" : "ok";
-    li.textContent = text;
+    li.textContent = rt(text);
     $("warnings").appendChild(li);
     while ($("warnings").children.length > 5) $("warnings").firstChild.remove();
     setTimeout(() => li.remove(), kind === "warn" ? 12000 : 7000);
@@ -27,9 +28,9 @@
     if (!text || shown.has(text)) return;
     shown.add(text);
     const li = document.createElement("li");
-    li.textContent = text;
+    li.textContent = rt(text);
     const x = document.createElement("button");
-    x.type = "button"; x.className = "x"; x.setAttribute("aria-label", "Fermer"); x.textContent = "×";
+    x.type = "button"; x.className = "x"; x.setAttribute("aria-label", t("look.close")); x.textContent = "×";
     x.addEventListener("click", () => { li.remove(); shown.delete(text); });
     li.append(x);
     $("warnings").appendChild(li);
@@ -238,7 +239,7 @@
       // télécharger l'installateur à la main. L'utilisateur n'est jamais bloqué.
       $("update-install").disabled = false;
       $("update-title").textContent = t("upd.failed");
-      $("update-notes").textContent = String(e);
+      $("update-notes").textContent = rt(e);
       $("update-manual").hidden = false;
     }
   }
@@ -264,7 +265,7 @@
   function renderStatus() {
     const S = TT.store.S;
     const el = $("data-status");
-    if (S.busy) el.textContent = S.busy;
+    if (S.busy) el.textContent = rt(S.busy);
     else if (S.error && S.retryAt) el.textContent = t("misc.serverDown", { time: new Date(S.retryAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) });
     else if (S.data) el.textContent = t("misc.dataAgo", { ago: TT.store.ago(S.data.fetchedAt) });
     else el.textContent = t("misc.noDataShort");
@@ -277,9 +278,13 @@
     if (n > 1048576) return (n / 1048576).toFixed(1) + " " + t("misc.mb");
     return Math.max(1, Math.round(n / 1024)) + " " + t("misc.kb");
   };
+  /** « C:\chemin : diag.exists » → chemin + suffixe traduit (le chemin n'est jamais un code). */
+  function rtTried(tp) {
+    const i = tp.lastIndexOf(" : ");
+    return i > 0 ? tp.slice(0, i) + " : " + rt(tp.slice(i + 3)) : rt(tp);
+  }
   function fmtDiag(d) {
-    const L = [];
-    L.push(`${t("diag.logsDir")} : ${d.logs_dir || t("diag.notFound")} (${d.logs_dir_source})`);
+    const L = [];    L.push(`${t("diag.logsDir")} : ${d.logs_dir || t("diag.notFound")} (${rt(d.logs_dir_source)})`);
     L.push(`${t("diag.logSessions")} : ${d.sessions}${d.latest_session ? " · " + t("diag.latest") + " : " + d.latest_session : ""}`);
     if (d.files.length) {
       L.push(t("diag.lastSessionFiles") + " :");
@@ -295,9 +300,9 @@
     L.push(`${t("diag.lastMapEvent")} : ${lastMapEvent || t("diag.none")}`);
     L.push(`${t("diag.screenshots")} : ${d.screenshots_dir} (${d.screenshots_dir_exists ? t("diag.exists") : t("diag.absent")})${d.newest_screenshot ? " · " + t("diag.newest") + " : " + d.newest_screenshot : ""}`);
     L.push("", t("diag.conclusion") + " :");
-    d.hints.forEach((h) => L.push("  - " + h));
+    (d.hints || []).forEach((h) => L.push("  - " + rt(h)));
     if (d.recent_lines.length) { L.push("", t("diag.recentLogLines") + " :"); d.recent_lines.forEach((l) => L.push("  " + l)); }
-    if (d.tried.length) { L.push("", t("diag.checkedPaths") + " :"); d.tried.slice(0, 12).forEach((tp) => L.push("  " + tp)); }
+    if (d.tried.length) { L.push("", t("diag.checkedPaths") + " :"); d.tried.slice(0, 12).forEach((tp) => L.push("  " + rtTried(tp))); }
     return L.join("\n");
   }
   async function runDiag() {
@@ -311,6 +316,7 @@
 
   /* ---------- Diagnostic (débogage) ---------- */
   let diagText = "";
+  let lastDiag = null;
   const SEV_LABEL = { error: "diag.sev.error", warn: "diag.sev.warn", ok: "diag.sev.ok" };
   const SEV_ORDER = { error: 0, warn: 1, ok: 2 };
 
@@ -318,12 +324,13 @@
   function diagIssues(d) {
     if (Array.isArray(d.issues) && d.issues.length) return d.issues;
     return (d.hints || []).map((h) => ({
-      severity: /en ordre|rien à signaler/i.test(h) ? "ok" : "warn",
+      severity: h === "diag.r.okLogs" || /en ordre|rien à signaler/i.test(h) ? "ok" : "warn",
       title: h, detail: "", fix: "",
     }));
   }
   /** Affiche le verdict en clair : d'abord ce qui cloche, puis le détail technique repliable. */
   function renderDiag(d) {
+    lastDiag = d;
     diagText = fmtDiag(d);
     const out = $("diag-out");
     const issues = diagIssues(d);
@@ -335,9 +342,9 @@
       : warns ? t("diag.verdict.warn", { n: warns }) : t("diag.verdict.ok");
     const cards = [...issues]
       .sort((a, b) => (SEV_ORDER[a.severity] ?? 3) - (SEV_ORDER[b.severity] ?? 3))
-      .map((i) => `<div class="diag-card ${esc(i.severity)}"><div class="diag-head"><span class="diag-sev">${esc(t(SEV_LABEL[i.severity] || "diag.sev.ok"))}</span><b>${esc(i.title)}</b></div>` +
-        (i.detail ? `<p class="diag-detail">${esc(i.detail)}</p>` : "") +
-        (i.fix ? `<p class="diag-fix"><b>${esc(t("diag.fix"))}</b> ${esc(i.fix)}</p>` : "") + "</div>").join("");
+      .map((i) => `<div class="diag-card ${esc(i.severity)}"><div class="diag-head"><span class="diag-sev">${esc(t(SEV_LABEL[i.severity] || "diag.sev.ok"))}</span><b>${esc(rt(i.title))}</b></div>` +
+        (i.detail ? `<p class="diag-detail">${esc(rt(i.detail))}</p>` : "") +
+        (i.fix ? `<p class="diag-fix"><b>${esc(t("diag.fix"))}</b> ${esc(rt(i.fix))}</p>` : "") + "</div>").join("");
     out.className = "diag-out has-" + state;
     out.innerHTML =
       `<div class="diag-verdict ${state}">${esc(verdict)}</div>` + cards +

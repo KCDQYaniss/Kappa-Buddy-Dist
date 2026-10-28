@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering as AtomicOrdering};
 use std::sync::Mutex;
+use tarkov_core::msg::{code, msg};
 use tarkov_core::{self as core, paths, Config, Event, MapInfo, Position};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -301,16 +302,16 @@ fn apply_overlay_hotkeys(app: &AppHandle, capture: &str, toggle: &str, auto: &st
         }
         let parsed = combo
             .parse::<Shortcut>()
-            .map_err(|e| format!("Raccourci {what} « {combo} » invalide : {e}"))?;
+            .map_err(|e| msg("err.hotkeyBad", serde_json::json!({"what": what, "combo": combo, "e": e.to_string()})))?;
         gs.register(parsed.clone())
-            .map_err(|e| format!("Impossible d'enregistrer le raccourci {what} « {combo} » : {e}"))
+            .map_err(|e| msg("err.hotkeyRegister", serde_json::json!({"what": what, "combo": combo, "e": e.to_string()})))
             .map(|_| *slot = Some(parsed))
     };
 
-    register(&mut cfg.capture, capture, "de capture")?;
-    register(&mut cfg.toggle, toggle, "d'affichage")?;
-    register(&mut cfg.auto, auto, "du mode auto")?;
-    register(&mut cfg.hide, hide, "de masquage")?;
+    register(&mut cfg.capture, capture, "hk.capture")?;
+    register(&mut cfg.toggle, toggle, "hk.toggle")?;
+    register(&mut cfg.auto, auto, "hk.auto")?;
+    register(&mut cfg.hide, hide, "hk.hide")?;
 
     println!("[hotkey] capture=\"{capture}\" toggle=\"{toggle}\" auto=\"{auto}\" hide=\"{hide}\"");
     Ok(())
@@ -759,7 +760,7 @@ fn diagnose(state: State<AppState>) -> core::diag::Diagnostics {
 #[tauri::command]
 async fn rescan_quests(state: State<'_, AppState>) -> Result<core::logs::ScanReport, String> {
     let cfg = effective_config(&state.settings.lock().unwrap());
-    let dir = cfg.logs_dir.ok_or("Dossier des logs introuvable : renseigne-le dans Réglages.")?;
+    let dir = cfg.logs_dir.ok_or_else(|| code("w.logsDir"))?;
     tauri::async_runtime::spawn_blocking(move || core::logs::scan_task_history_report(&dir)).await.map_err(|e| e.to_string())
 }
 
@@ -784,16 +785,16 @@ async fn read_screen_text(state: State<'_, AppState>, path: Option<String>) -> R
         Some(p) if !p.trim().is_empty() => std::path::PathBuf::from(p),
         _ => {
             if !cfg.screenshots_dir.is_dir() {
-                return Err("Aucune capture d'écran trouvée dans le dossier configuré.".into());
+                return Err(code("err.noScreenshots"));
             }
             match ocr::list_screenshots(&cfg.screenshots_dir).into_iter().next() {
                 Some(p) => p,
-                None => return Err("Aucune capture d'écran trouvée dans le dossier configuré.".into()),
+                None => return Err(code("err.noScreenshots")),
             }
         }
     };
     if !target.is_file() {
-        return Err(format!("Fichier introuvable : {}", target.display()));
+        return Err(msg("err.fileMissing", serde_json::json!({"file": target.display().to_string()})));
     }
     tauri::async_runtime::spawn_blocking(move || ocr::read_lines(&target))
         .await
@@ -1025,7 +1026,7 @@ async fn check_update(app: AppHandle) -> Result<Option<UpdateInfo>, String> {
 #[tauri::command]
 async fn install_update(app: AppHandle) -> Result<(), String> {
     let updater = app.updater_builder().build().map_err(|e| e.to_string())?;
-    let update = updater.check().await.map_err(|e| e.to_string())?.ok_or("Aucune mise à jour disponible.")?;
+    let update = updater.check().await.map_err(|e| e.to_string())?.ok_or_else(|| code("err.noUpdate"))?;
     update.download_and_install(|_chunk, _total| {}, || {}).await.map_err(|e| e.to_string())
 }
 
@@ -1043,12 +1044,12 @@ fn open_releases(app: AppHandle) -> Result<String, String> {
         .and_then(|e| e.as_array())
         .and_then(|a| a.first())
         .and_then(|v| v.as_str())
-        .ok_or("Adresse de mise à jour introuvable.")?;
+        .ok_or_else(|| code("err.updateMissing"))?;
     // `…/OWNER/REPO/releases/latest/download/latest.json` → `…/OWNER/REPO/releases/latest`
-    let base = endpoint.split("/releases/").next().ok_or("Adresse de mise à jour inattendue.")?;
+    let base = endpoint.split("/releases/").next().ok_or_else(|| code("err.updateUnexpected"))?;
     let url = format!("{base}/releases/latest");
     if !url.starts_with("https://") {
-        return Err("Adresse de mise à jour non sécurisée.".into());
+        return Err(code("err.updateInsecure"));
     }
     open_browser(&url)?;
     Ok(url)

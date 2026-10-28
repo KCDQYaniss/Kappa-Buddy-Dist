@@ -7,6 +7,7 @@
 //! Le texte reconnu sert au rattrapage de quêtes.
 #![cfg(windows)]
 
+use tarkov_core::msg::{code, msg};
 use std::path::Path;
 
 /// Script PowerShell embarqué : lit les langues OCR du profil, décode l'image, renvoie les lignes.
@@ -73,7 +74,7 @@ pub fn list_screenshots(dir: &Path) -> Vec<std::path::PathBuf> {
 pub fn read_lines(path: &Path) -> Result<Vec<String>, String> {
     use std::process::Command;
     if !path.is_file() {
-        return Err(format!("Fichier introuvable : {}", path.display()));
+        return Err(msg("err.fileMissing", serde_json::json!({"file": path.display().to_string()})));
     }
     let out = Command::new("powershell")
         .args([
@@ -82,15 +83,11 @@ pub fn read_lines(path: &Path) -> Result<Vec<String>, String> {
         ])
         .env("OCR_PATH", path)
         .output()
-        .map_err(|e| format!("Impossible de lancer PowerShell : {}", e))?;
+        .map_err(|e| msg("err.powershell", serde_json::json!({"e": e.to_string()})))?;
     let stderr = String::from_utf8_lossy(&out.stderr);
     let stdout = String::from_utf8_lossy(&out.stdout);
     if stdout.contains("__NO_LANGUAGES__") || stdout.contains("__NO_ENGINE__") {
-        return Err(
-            "OCR Windows indisponible : installe une langue puis son module de reconnaissance \
-             (Paramètres > Heure & langue > Langue, ex : Français/English)."
-                .to_string(),
-        );
+        return Err(code("err.ocrUnavailable"));
     }
     let lines: Vec<String> = stdout
         .lines()
@@ -98,10 +95,9 @@ pub fn read_lines(path: &Path) -> Result<Vec<String>, String> {
         .filter(|l| !l.is_empty())
         .collect();
     if lines.is_empty() {
-        return Err(format!(
-            "OCR n'a reconnu aucun texte dans {}\n{}",
-            path.display(),
-            stderr.trim()
+        return Err(msg(
+            "err.ocrFailed",
+            serde_json::json!({"file": path.display().to_string(), "err": stderr.trim().to_string()}),
         ));
     }
     Ok(lines)
