@@ -33,6 +33,9 @@
   let manualSlug = "auto";                 // « auto » = on suit la map détectée dans les logs (jamais mémorisé entre deux lancements)
   let follow = localStorage.getItem("follow") !== "off";          // suivi du joueur : activé par défaut
   let mapBright = localStorage.getItem("mapBright") === "on";     // carte éclaircie (les cartes sont sombres)
+  // Fond de carte : « community » (cartes tarkov-dev, CC BY-NC-SA) ou « tactical »
+  // (généré depuis les positions de jeu, 100 % à nous — cf. ui/tactical.js).
+  let mapStyle = localStorage.getItem("mapStyle") === "tactical" ? "tactical" : "community";
   const layerOn = Object.assign({ extracts: true, locks: true, transits: true, quests: true, questsAvail: true, customPoints: true }, store("layers", {}));
   const offTypes = new Set(store("offTypes", []));
   const offLockTypes = new Set(store("offLockTypes", []));   // verrous masqués par type : door | trunk
@@ -130,13 +133,36 @@
     syncLayers(); renderSidebar(); renderFloors(); refreshEmpty();
   }
 
+  /** Régénère le(s) fond(s) sans reconstruire la carte : zoom et position préservés.
+      Utilisé par le toggle tactique, l'arrivée de données, un changement de langue
+      (libellés de zones) ou de thème (palette du fond). */
+  function refreshBase() {
+    if (!cur) return;
+    if (cur.baseLayer) { cur.lf.removeLayer(cur.baseLayer); cur.baseLayer = null; }
+    if (cur.floorLayer) { cur.lf.removeLayer(cur.floorLayer); cur.floorLayer = null; }
+    setFloorLayer(cur.floorIndex);
+  }
+
   /* ---------- Étages (Interchange, Customs, Factory, Réserve, Labs…) ---------- */
+  /** Thème courant (le fond tactique suit la palette de l'app). */
+  const themeNow = () => (document.documentElement && document.documentElement.dataset.theme) || "dark";
   /** Source visuelle d'un étage (`{ image }` ou `{ tiles }`). L'étage 0 est le rez-de-chaussée. */
   function floorSource(i) {
     const def = cur.def, fl = def.floors;
     return fl && fl[i] ? fl[i] : { image: def.image, tiles: def.tiles, tileSize: def.tileSize };
   }
-  function makeFloorLayer(f, opacity) {
+  function makeFloorLayer(f, opacity, floorIdx) {
+    // Vue tactique : fond généré depuis les positions de jeu (ui/tactical.js).
+    // Sans données (démarrage, carte sans loot) → repli sur l'image communauté.
+    if (mapStyle === "tactical" && TT.tactical) {
+      const md = mapData();
+      const svg = md ? TT.tactical.build(cur.def, md, floorIdx || 0, themeNow(), TT.i18n.current()) : "";
+      if (svg) {
+        const layer = L.imageOverlay("data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg), cur.imageBounds, { opacity, interactive: false });
+        layer._tactical = true;
+        return layer;
+      }
+    }
     if (f.image) return L.imageOverlay(f.image, cur.imageBounds, { opacity });
     if (f.tiles) return L.tileLayer(f.tiles, { tileSize: f.tileSize || cur.def.tileSize || 256, bounds: cur.imageBounds, noWrap: true, minZoom: cur.def.minZoom, maxZoom: cur.def.maxZoom, opacity });
     return null;
@@ -151,12 +177,12 @@
     const idx = fl && fl[i] ? i : 0;
     // Le rez-de-chaussée, monté une seule fois, reste à l'arrière-plan.
     if (!cur.baseLayer) {
-      cur.baseLayer = makeFloorLayer(floorSource(0), 1);
+      cur.baseLayer = makeFloorLayer(floorSource(0), 1, 0);
       if (cur.baseLayer) cur.baseLayer.addTo(cur.lf);
     }
     if (cur.floorLayer) { cur.lf.removeLayer(cur.floorLayer); cur.floorLayer = null; }
     if (idx !== 0) {
-      cur.floorLayer = makeFloorLayer(floorSource(idx), 1);
+      cur.floorLayer = makeFloorLayer(floorSource(idx), 1, idx);
       if (cur.floorLayer) cur.floorLayer.addTo(cur.lf);
       if (cur.baseLayer && cur.baseLayer.setOpacity) cur.baseLayer.setOpacity(0.32);
     } else if (cur.baseLayer && cur.baseLayer.setOpacity) {
@@ -1191,6 +1217,25 @@
     document.querySelector(".map-view").classList.toggle("map-bright", mapBright);
   });
   $("map-bright-btn").setAttribute("aria-pressed", String(mapBright));
+  // Bascule community (cartes tarkov-dev) ↔ tactique (fond généré, sans restriction).
+  $("map-tactical-btn").setAttribute("aria-pressed", String(mapStyle === "tactical"));
+  $("map-tactical-btn").addEventListener("click", () => {
+    mapStyle = mapStyle === "tactical" ? "community" : "tactical";
+    localStorage.setItem("mapStyle", mapStyle);
+    $("map-tactical-btn").setAttribute("aria-pressed", String(mapStyle === "tactical"));
+    TT.tactical.invalidate();
+    refreshBase();
+  });
+  // Le fond tactique suit la langue (libellés de zones) et le thème (palette).
+  TT.i18n.onChange(() => {
+    TT.tactical.invalidate();
+    if (mapStyle === "tactical") refreshBase();
+  });
+  if (typeof MutationObserver === "function") {
+    new MutationObserver(() => {
+      if (mapStyle === "tactical") { TT.tactical.invalidate(); refreshBase(); }
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  }
   $("follow-btn").addEventListener("click", () => setFollow(!follow));
 
   // La progression peut changer en dehors de la carte (logs du jeu, rattrapage, OCR) :
@@ -1207,6 +1252,7 @@
       if (!cur) return;
       syncLayers();
       renderSidebar();
+      if (k === "data") { TT.tactical.invalidate(); if (mapStyle === "tactical") refreshBase(); }
     });
   });
 

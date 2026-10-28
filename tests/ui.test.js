@@ -56,7 +56,7 @@ w.__TAURI__ = {
 w.localStorage.setItem("manualMap", "customs"); // ancien choix mémorisé : ne doit plus bloquer l'automatique
 const errors = [];
 w.addEventListener("error", (e) => errors.push(e.message));
-for (const f of ["i18n.js", "theme.js", "vendor/leaflet.js", "geo.js", "store.js", "mapview.js", "quests.js", "items.js", "hideout.js", "catchup.js", "tour.js", "app.js"]) w.eval(fs.readFileSync(root + f, "utf8"));
+for (const f of ["i18n.js", "theme.js", "vendor/leaflet.js", "geo.js", "tactical.js", "store.js", "mapview.js", "quests.js", "items.js", "hideout.js", "catchup.js", "tour.js", "app.js"]) w.eval(fs.readFileSync(root + f, "utf8"));
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 let failed = 0;
@@ -417,6 +417,21 @@ const emit = (n, payload) => handlers[n]({ payload });
   ok(w.localStorage.getItem("mapBright") === "on", "carte éclaircie mémorisée");
   brightBtn.click();
   ok(!d.querySelector(".map-view").classList.contains("map-bright"), "second clic : classe retirée");
+
+  // Vue tactique : fond généré depuis les données (sans image communauté).
+  const tacBtn = d.getElementById("map-tactical-btn");
+  ok(!!tacBtn, "bouton « vue tactique » présent");
+  ok(tacBtn.getAttribute("aria-pressed") === "false", "vue tactique désactivée au départ");
+  const communitySrc = () => (d.querySelector("#map img.leaflet-image-layer") || {}).src || "";
+  tacBtn.click();
+  ok(tacBtn.getAttribute("aria-pressed") === "true", "vue tactique activée au clic");
+  ok(w.localStorage.getItem("mapStyle") === "tactical", "style de carte mémorisé");
+  const tacSrc = communitySrc();
+  ok(/^data:image\/svg\+xml/.test(tacSrc), "fond tactique : le calque de base devient un SVG généré");
+  ok(/viewBox=/.test(decodeURIComponent(tacSrc)), "le SVG tactique porte sa viewBox (projection calibrée)");
+  tacBtn.click();
+  ok(!/^data:/.test(communitySrc()), "retour community : l'image de carte communauté est réaffichée");
+  ok(w.localStorage.getItem("mapStyle") === "community", "retour community mémorisé");
 
   themeSel.value = "dark"; themeSel.dispatchEvent(new w.Event("change"));
   ok(d.documentElement.dataset.theme === "dark", "retour au thème sombre");

@@ -48,6 +48,7 @@
   }
 
   const api = { rotate, makeCalibration, imageBoundsLatLng };
+  // Les deux consommateurs : navigateur (window.Geo) et tests Node (module.exports).
+  root.Geo = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
-  else root.Geo = api;
 })(typeof window !== "undefined" ? window : globalThis);

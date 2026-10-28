@@ -37,6 +37,7 @@
             <span class="spacer"></span>
             <button id="center-btn" class="btn sm" type="button" data-i18n="map.center">Centrer sur moi</button>
             <button id="map-bright-btn" class="btn sm toggle" type="button" aria-pressed="false" data-i18n-title="map.bright.tip" title="Éclaircit l'image de carte (les cartes sont sombres)"><i></i><span data-i18n="map.bright">Carte éclaircie</span></button>
+            <button id="map-tactical-btn" class="btn sm toggle" type="button" aria-pressed="false" data-i18n-title="map.tactical.tip" title="Fond de carte généré depuis les données du jeu (sans image communauté)"><i></i><span data-i18n="map.tactical">Vue tactique</span></button>
             <button id="follow-btn" class="btn sm toggle" type="button" aria-pressed="true" data-i18n-title="map.follow.tip" title="Recentre la carte sur ta position à chaque capture d'écran"><i></i><span data-i18n="map.follow.on">Suivi : activé</span></button>
           </div>
           <section id="empty" class="empty" hidden>
@@ -294,6 +295,7 @@
   <script src="theme.js"></script>
   <script src="vendor/leaflet.js"></script>
   <script src="geo.js"></script>
+  <script src="tactical.js"></script>
   <script src="store.js"></script>
   <script src="mapview.js"></script>
   <script src="quests.js"></script>

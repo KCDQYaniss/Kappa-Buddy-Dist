@@ -77,7 +77,7 @@
       const slug = slugOf(m.normalizedName);
       const e = (idx.maps[slug] = idx.maps[slug] || {
         slug, name: m.name, nameId: m.nameId, raidDuration: m.raidDuration, players: m.players,
-        extracts: [], transits: [], spawns: [], containers: [], loose: [], stationary: [], bosses: [], locks: [],
+        extracts: [], transits: [], spawns: [], containers: [], loose: [], stationary: [], bosses: [], locks: [], hazards: [],
       });
       if (m.normalizedName === slug) { e.name = m.name; e.raidDuration = m.raidDuration; e.players = m.players; }
       e.extracts.push(...(m.extracts || []).filter((x) => x.position));
@@ -86,6 +86,7 @@
       e.containers.push(...(m.lootContainers || []).filter((x) => x.position && x.lootContainer));
       e.loose.push(...(m.lootLoose || []).filter((x) => x.position));
       e.stationary.push(...(m.stationaryWeapons || []).filter((x) => x.position));
+      e.hazards.push(...(m.hazards || []).filter((x) => x.outline || x.position));
       if (m.normalizedName === slug || !e.bosses.length) e.bosses = m.bosses || e.bosses;
       for (const l of m.locks || []) {
         if (!l.position) continue;
