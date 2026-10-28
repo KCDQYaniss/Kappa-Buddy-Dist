@@ -4,9 +4,9 @@ Worker Cloudflare (gratuit) + base **D1** (SQLite). Déploiement **unique**,
 aucune gestion au quotidien : l'acheteur colle sa clé itch, le Worker lie
 son appareil et émet un **token signé perma** que l'app vérifie localement.
 L'app ne recontacte ce Worker que pour **activer** une machine ou **libérer**
-l'ancienne (swap) — Jamais en jeu.
+l'ancienne (swap) — jamais en jeu.
 
-## Modèle retenu (décisions du 27 oct)
+## Modèle retenu (décisions du 27 oct. 2026)
 
 - Un achat itch = une **download key** = une licence **à vie**.
 - **1 appareil par clé** (`MAX_BINDS`), change de PC en self-service :
@@ -56,7 +56,7 @@ La suite injecte une fausse itch et une D1 en mémoire et vérifie : activation,
 idempotence, refus 2ᵉ appareil, swap + cooldown, clés négatives, plan B
 vendeur, admin complet, confidentialité (aucune clé brute dans une réponse).
 
-## Protocole app ↔ Worker (contrat pour `src-tauri/src/license.rs`)
+## Protocole app ↔ Worker (contrat du module de licence de l'app, à implémenter)
 
 - Empreinte machine : `SHA-256 hex` de l'empreinte (MachineGuid + sel fixe).
 - `POST /v1/activate {key, device, label?}` →
@@ -96,7 +96,7 @@ réelle avec la clé d'un achat test (revalider les patterns itch ci-dessus).
 node -e "const c=require('crypto');const k=c.generateKeyPairSync('ed25519');console.log('PRIVATE_PKCS8_B64='+k.privateKey.export({type:'pkcs8',format:'der'}).toString('base64'));console.log('PUBLIC_RAW_HEX='+k.publicKey.export({type:'spki',format:'der'}).subarray(12).toString('hex'))"
 ```
 - `PRIVATE_PKCS8_B64` → secret Worker (signe les tokens)
-- `PUBLIC_RAW_HEX` → 32 octets compilés dans `license.rs` (vérifie)
+- `PUBLIC_RAW_HEX` → 32 octets compilés dans le module de licence de l'app (vérifie)
 
 ## Admin
 

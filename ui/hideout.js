@@ -63,7 +63,7 @@
   const itemOf = (id) => (TT.store.S.idx && TT.store.S.idx.items[id]) || null;
   const stationById = (id) => stations().find((s) => s.id === id) || null;
   const maxLevel = (st) => (st.levels || []).reduce((m, lv) => Math.max(m, lv.level), 0);
-  const deficit = (needs) => needs.reduce((n, r) => n + Math.max(0, r.count - TT.store.itemCount(r.id)), 0);
+  const deficit = (needs) => needs.reduce((n, r) => n + (!(F.ignoreFir && r.fir) ? Math.max(0, r.count - TT.store.itemCount(r.id)) : 0), 0);
 
   /* ---------- Rendu ---------- */
 
@@ -75,7 +75,6 @@
     const done = lvl >= max;
     const state = done ? "st-finished" : missing ? "" : "st-started";
     const pct = max ? Math.round((lvl / max) * 100) : 0;
-    const bonusIcons = (next.flatMap((r) => []) || []);
     // Bonus du prochain niveau (depuis les données de niveau)
     const nextLevel = (st.levels || []).find((lv) => lv.level === lvl + 1);
     const bonuses = nextLevel ? nextLevel.bonuses || [] : [];
@@ -136,7 +135,7 @@
     if (nextLevel && nextLevel.description) {
       const translated = t(nextLevel.description);
       if (translated !== nextLevel.description) h += `<p class="h-desc">${esc(translated)}</p>`;
-      else h += `<p class="h-desc">${esc(st.name)} – Niveau ${lvl + 1}</p>`;
+      else h += `<p class="h-desc">${esc(st.name)} – ${t("q.level")} ${lvl + 1}</p>`;
     }
     h += `<div class="meta"><span>${esc(t("h.level", { n: lvl }))}</span><span>${esc(t("h.maxLevel", { n: max }))}</span></div>`;
 
@@ -174,13 +173,13 @@
     if (pre.length) h += `<h3>${esc(t("h.prereqs"))}</h3><div class="preq-list">${pre.join("")}</div>`;
 
     // Objets requis
-    const nextShown = next.filter((r) => !F.onlyMissing || TT.store.itemCount(r.id) < r.count);
+    const nextShown = next.filter((r) => !(F.ignoreFir && r.fir) && (!F.onlyMissing || TT.store.itemCount(r.id) < r.count));
     h += `<h3>${esc(t("h.nextLevel", { n: lvl + 1 }))}</h3>`;
     h += nextShown.length ? nextShown.map((r) => reqRow(r, t("h.forLevel", { n: lvl + 1 }))).join("") : `<p class="dim">${esc(t("h.allReady"))}</p>`;
 
     // Niveaux suivants
     if (lvl + 1 < max) {
-      const restShown = rest.filter((r) => !F.onlyMissing || TT.store.itemCount(r.id) < r.count);
+      const restShown = rest.filter((r) => !(F.ignoreFir && r.fir) && (!F.onlyMissing || TT.store.itemCount(r.id) < r.count));
       h += `<h3>${esc(t("h.restLevels", { from: lvl + 2, to: max }))}</h3>`;
       h += restShown.length ? restShown.map((r) => reqRow(r, t("h.forLevels", { list: r.levels.join(", ") }))).join("") : `<p class="dim">${esc(t("h.allReady"))}</p>`;
     }

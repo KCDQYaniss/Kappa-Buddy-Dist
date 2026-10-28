@@ -35,7 +35,7 @@ function collectArtifacts(version) {
     : [];
   const setup = files.map((f) => ({ f, m: fs.statSync(path.join(bundle, f)).mtimeMs })).sort((a, b) => b.m - a.m)[0];
   const latest = path.join(ROOT, "dist", "latest.json");
-  const portable = path.join(ROOT, "dist", `TarkovTracker-${version}-portable.zip`);
+  const portable = path.join(ROOT, "dist", `KappaBuddy-${version}-portable.zip`);
 
   const missing = [];
   if (!setup) missing.push(`installateur signé (target/release/bundle/nsis/*setup*.exe pour ${version})`);

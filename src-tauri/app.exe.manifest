@@ -3,10 +3,10 @@
   <assemblyIdentity
     version="0.7.0.0"
     processorArchitecture="*"
-    name="TarkovTracker.app"
+    name="KappaBuddy.app"
     type="win32"
   />
-  <description>Tarkov Tracker - Suivi de quêtes pour Escape from Tarkov</description>
+  <description>Kappa Buddy - Suivi de quêtes pour Escape from Tarkov</description>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
       <requestedPrivileges>

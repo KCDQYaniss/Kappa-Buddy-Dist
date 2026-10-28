@@ -1,4 +1,4 @@
-# Redistribuer Tarkov Tracker
+# Redistribuer Kappa Buddy
 
 Tout ce qu'il faut pour préparer une version à partager, et les règles à respecter.
 
@@ -45,7 +45,7 @@ L'app vérifie les mises à jour **au démarrage** et propose à l'utilisateur d
 1. Crée un dépôt GitHub (public ou privé) et dépose-y le code.
 2. Renseigne-le dans `tools/release.config.json` :
    ```json
-   { "repo": "TON-COMPTE/tarkov-tracker", "notes": "" }
+   { "repo": "TON-COMPTE/Kappa-Buddy-Dist", "legacyRepo": "TON-COMPTE/Tarkov-Tracker", "notes": "" }
    ```
 3. La clé de signature des mises à jour a déjà été générée dans `%USERPROFILE%\.tauri\tarkov-tracker.key`.
    **Sauvegarde-la et garde-la secrète.** Si tu la perds, les installations existantes ne pourront plus se mettre à jour
@@ -98,7 +98,7 @@ Si tu préfères éviter l'installateur (ou si NSIS échoue) :
 
 ```
 npm run build
-npm run zip          # -> dist/TarkovTracker-<version>-portable.zip
+npm run zip          # -> dist/KappaBuddy-<version>-portable.zip
 ```
 
 L'archive contient l'exécutable, un `LISEZ-MOI.txt`, `README.md`, `CHANGELOG.md` et `CREDITS.md`. Aucune installation : on double-clique.

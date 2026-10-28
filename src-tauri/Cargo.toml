@@ -1,7 +1,7 @@
 [package]
 name = "tarkov-tracker"
 version = "0.9.19"
-description = "Escape from Tarkov quest tracker and position tracker"
+description = "Kappa Buddy - companion for Escape from Tarkov: quests, maps, live position, price overlay"
 edition = "2021"
 
 [build-dependencies]

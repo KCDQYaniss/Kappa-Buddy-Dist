@@ -110,7 +110,7 @@
       const task = idx.tasks[tid], s = st.stateOf(task);
       return `<button class="link st-${s}" data-task="${esc(task.id)}" type="button"><i class="dot"></i>${esc(task.name)}${u.count > 1 ? " × " + u.count : ""}${u.fir ? " (FIR)" : ""}</button>`;
     }).join("") + "</div>" : `<p class="dim">${esc(t("i.noQuest"))}</p>`;
-    h += `<h3>${esc(t("i.hideout"))}</h3>`;
+    h += `<h3>${esc(t("i.hideoutSection"))}</h3>`;
     const ho = idx.hideoutByItem[it.id] || [];
     h += ho.length ? '<div class="links">' + ho.slice(0, 12).map((u) =>
       `<span class="link"><i class="dot"></i>${esc(u.station)} <em>${esc(t("q.lvlShort", { n: u.level }))} · × ${u.count}${u.fir ? " FIR" : ""}</em></span>`).join("") +

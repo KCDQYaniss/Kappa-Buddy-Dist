@@ -1,7 +1,10 @@
 {
-  "name": "tarkov-tracker",
+  "name": "kappa-buddy",
   "version": "0.9.19",
   "private": true,
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "maps": "python3 tools/prepare_maps.py || python tools/prepare_maps.py",
     "dev": "tauri dev",

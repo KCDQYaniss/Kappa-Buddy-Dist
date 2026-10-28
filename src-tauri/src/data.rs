@@ -221,7 +221,7 @@ fn download(app: &AppHandle, lang: &str) -> Result<String, String> {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .http_status_as_error(false)
         .timeout_global(Some(Duration::from_secs(240)))
-        .user_agent("TarkovTracker/0.6")
+        .user_agent("KappaBuddy/1.0")
         .build()
         .into();
 

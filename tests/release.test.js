@@ -10,6 +10,7 @@ const ok = (cond, msg) => { console.log((cond ? "  ok   " : "  ÉCHEC ") + msg);
 console.log("Nommage des assets et URL de mise à jour");
 // GitHub transforme les espaces en points : le nom local, l'URL et l'asset doivent coïncider.
 ok(normalizeAssetName("Tarkov Tracker_0.7.2_x64-setup.exe") === "Tarkov.Tracker_0.7.2_x64-setup.exe", "les espaces deviennent des points");
+ok(normalizeAssetName("Kappa Buddy_1.0.0_x64-setup.exe") === "Kappa.Buddy_1.0.0_x64-setup.exe", "rebrand : « Kappa Buddy » se normalise pareil");
 ok(normalizeAssetName("sans_espace.exe") === "sans_espace.exe", "un nom sans espace est inchangé");
 ok(assetPathSegment("Tarkov Tracker_0.7.2_x64-setup.exe") === "Tarkov.Tracker_0.7.2_x64-setup.exe", "segment d'URL normalisé");
 const url = assetUrl("KCDQYaniss/Tarkov-Tracker", "v0.7.2", "Tarkov Tracker_0.7.2_x64-setup.exe");

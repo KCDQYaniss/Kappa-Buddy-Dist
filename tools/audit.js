@@ -9,9 +9,11 @@ const fs = require("fs");
 const path = require("path");
 
 const ROOT = path.resolve(__dirname, "..");
-const SKIP_DIRS = new Set(["node_modules", "target", ".git", ".vscode", "dist"]);
+const SKIP_DIRS = new Set(["node_modules", "target", ".git", ".vscode", "dist", "tarkov-price-overlay-dev"]);
 // Fichiers engendrés à la compilation : à ne pas livrer (ils se recréent).
 const SKIP_PATHS = [/^src-tauri[\\/]gen[\\/]/];
+// Assistants de build locaux (*.bat à la racine) : jamais livrés, non audités.
+const SKIP_EXT = new Set([".bat"]);
 // Extensions binaires qu'on ne peut pas lire ligne à ligne.
 const BINARY = new Set([".png", ".ico", ".jpg", ".jpeg", ".gif", ".webp", ".ttf", ".otf", ".woff", ".woff2", ".zip", ".exe", ".dll"]);
 
@@ -21,6 +23,7 @@ const PATTERNS = [
   ["chemin utilisateur Unix", /\/(home|Users)\/[a-z0-9._-]+\//gi, "chemin absolu vers un profil utilisateur"],
   ["clé d'API", /\b(api[_-]?key|apikey|access[_-]?token|secret[_-]?key)\b\s*[:=]\s*["'][^"']{8,}/gi, "secret en clair"],
   ["clé privée", /-----BEGIN [A-Z ]*PRIVATE KEY-----/g, "clé privée"],
+  ["secret du Worker de licence", /\b(ADMIN_PASSWORD|ITCH_API_KEY|LICENSE_PRIVATE_PKCS8_B64|PRIVATE_PKCS8_B64|PUBLIC_RAW_HEX)\b\s*[:=]\s*["'][A-Za-z0-9+/_=-]{32,}["']/g, "secret du backend de licence en clair"],
   ["mot de passe", /\b(password|passwd|mot[_-]?de[_-]?passe)\b\s*[:=]\s*["'][^"']{4,}/gi, "identifiant en clair"],
   ["jeton Bearer", /Bearer\s+[A-Za-z0-9._-]{20,}/g, "jeton d'authentification"],
   ["jeton GitHub", /\bgh[pousr]_[A-Za-z0-9]{30,}\b/g, "jeton GitHub"],
@@ -29,9 +32,9 @@ const PATTERNS = [
 ];
 
 // Fichiers qui ne doivent jamais être livrés (données de l'utilisateur, secrets).
-const FORBIDDEN_FILE = /(^|[\\/])(\.env(\..*)?|.*\.pem|.*\.key|.*\.pfx|.*\.p12|id_rsa.*|.*\.log|.*\.sqlite|.*\.db|credentials.*|.*\.secret)$/i;
+const FORBIDDEN_FILE = /(^|[\\/])(\.env(\..*)?|\.dev\.vars(\..*)?|.*\.pem|.*\.key|.*\.pfx|.*\.p12|id_rsa.*|.*\.log|.*\.sqlite|.*\.db|credentials.*|.*\.secret)$/i;
 // Données personnelles du joueur qu'un utilisateur ne veut pas partager.
-const USER_DATA = /progress(-[a-z]+)?\.json$|settings\.json$|data-v2-.*\.json$/i;
+const USER_DATA = /progress(-[a-z]+)?\.json$|settings\.json$|data-v[23]-.*\.json$/i;
 
 function walk(dir, out) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -42,6 +45,7 @@ function walk(dir, out) {
       if (SKIP_PATHS.some((re) => re.test(rel + path.sep))) continue;
       walk(full, out);
     } else {
+      if (SKIP_EXT.has(path.extname(e.name).toLowerCase())) continue;
       out.push(full);
     }
   }

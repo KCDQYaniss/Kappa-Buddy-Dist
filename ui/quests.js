@@ -14,6 +14,7 @@
     plantItem: "q.type.plantItem", plantQuestItem: "q.type.plantItem", findQuestItem: "q.type.findQuestItem", giveQuestItem: "q.type.giveQuestItem", taskStatus: "q.type.taskStatus",
     playerLevel: "q.type.playerLevel", skill: "q.type.skill", buildWeapon: "q.type.buildWeapon", useItem: "q.type.useItem", traderLevel: "q.type.traderLevel",
     experience: "q.type.experience", traderStanding: "q.type.traderStanding",
+    sellItem: "q.type.sellItem", globalVariable: "q.type.globalVariable", dialogue: "q.type.dialogue",
   };
   const ORDER = { started: 0, locked: 1, failed: 2, finished: 3 };
   const mapName = (slug) => { const d = (TT.mapDefs || []).find((m) => m.slug === slugOf(slug)); return d ? d.name : String(slug).replace(/-/g, " "); };

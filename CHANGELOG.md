@@ -44,7 +44,7 @@
 
 ### FR
 - **Correctif « aucun objet est reconnu » après une mise à jour de l'app** : le moteur OCR (processus autonome) rejette toute capture dont le numéro d'ordre est inférieur au précédent et garde en mémoire ce numéro entre les sessions. Le compteur de l'app repartait de 1 à chaque redémarrage — après une mise à jour (ou même un simple redémarrage de l'app, la fenêtre d'OCR restant ouverte), toutes les lectures étaient rejetées et la carte affichait « Objet non reconnu » en permanence. Le compteur démarre désormais à l'heure système, toujours supérieur à celui de toute session précédente. (Diagnostic confirmé par sondes HTTP réelles sur :8765.)
-- **Table « corrections OCR » réparée** : les corrections saisies dans les réglages étaient envoyées au moteur comme une chaîne de texte au lieu d'un objet (rejet de la requête: 422) — toute lecture échouait tant qu'une correction existait. Envoyées désormais au format attendu.
+- **Table « corrections OCR » réparée** : les corrections saisies dans les réglages étaient envoyées au moteur comme une chaîne de texte au lieu d'un objet (rejet de la requête : 422) — toute lecture échouait tant qu'une correction existait. Envoyées désormais au format attendu.
 - Tests : nouveau test unitaire (monotonie inter-session du compteur), chaîne complète au vert.
 
 ### EN
@@ -98,7 +98,7 @@
 ## 0.9.13 — Quêtes ↔ carte : lieux fixes uniquement, marqueurs regroupés
 
 ### FR
-- **Carte : lieux imposes uniquement** — seuls les objectifs dont l'emplacement est explicitement fixé par la quête affichent des marqueurs : zone à visiter, objet de quête à un endroit précis, sortie nommée, zone de tir.
+- **Carte : lieux imposés uniquement** — seuls les objectifs dont l'emplacement est explicitement fixé par la quête affichent des marqueurs : zone à visiter, objet de quête à un endroit précis, sortie nommée, zone de tir.
 - **Fin des spawns génériques sur la carte** : une collecte de type « trouvez X en raid » (injecteur, clé, efedrine, arme…) ne génère plus les dizaines de points où l'objet *peut* apparaître. L'objectif reste visible dans l'onglet Quêtes.
 - **Marqueurs regroupés** : les objectifs proches ou superposés (même pièce, même porte) fusionnent en un seul marqueur ; l'infobulle liste toutes les quêtes concernées et la clé éventuellement requise (verrou du même endroit).
 - **Clic sur un marqueur** : ouvre le détail de la quête associée dans l'onglet Quêtes.
@@ -256,7 +256,7 @@
 ## 0.8.18 — thème light refonte complète
 
 ### FR
-- Thème clair entièrement refondu : la chrome est maintenant vraiment claire (barre du bas, onglets, boutons, panneaux, dialogues, scrollbars)
+- Thème clair entièrement refondu : l'habillage est maintenant vraiment clair (barre du bas, onglets, boutons, panneaux, dialogues, scrollbars)
 - Toutes les couleurs en dur qui ignoraient le thème sont converties
 - Correction des contrastes illisibles (tag « besoin », texte rouge sur fond clair)
 - Grain désactivé en thème clair, color-scheme light pour les contrôles natifs
@@ -426,7 +426,7 @@
 - Cache de données renouvelé automatiquement pour appliquer le correctif sans manipulation
 
 ### EN
-- Container icons now display their real name (« Sport bag », « Weapon crate »…) instead of a technical ID
+- Container icons now display their real name ("Sport bag", "Weapon crate"…) instead of a technical ID
 - Name comes from the official repository provided by the API (`lootContainers`)
 - Layer panel lists names instead of IDs
 - Falls back to a readable English label when a translation is missing

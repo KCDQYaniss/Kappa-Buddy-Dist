@@ -682,7 +682,7 @@ pub fn download_latest_sidecar() -> Result<(), String> {
 
     let release_json: serde_json::Value = client
         .get("https://api.github.com/repos/pado8/tarkov-price-overlay-releases/releases/latest")
-        .header("User-Agent", "Tarkov-Tracker")
+        .header("User-Agent", "KappaBuddy/1.0")
         .header("Accept", "application/vnd.github.v3+json")
         .send()
         .map_err(|e| format!("Failed to fetch release info: {}", e))?
@@ -728,7 +728,7 @@ pub fn download_latest_sidecar() -> Result<(), String> {
 
     let response = client
         .get(&download_url)
-        .header("User-Agent", "Tarkov-Tracker")
+        .header("User-Agent", "KappaBuddy/1.0")
         .send()
         .map_err(|e| format!("Failed to start download: {}", e))?;
 

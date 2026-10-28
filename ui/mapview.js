@@ -427,7 +427,7 @@
           <div class="cpp-header"><b>${esc(p.name || t("map.customPoint"))}</b></div>
           <div class="cpp-text">${esc(p.text || "")}</div>
           ${p.key ? `<div class="cpp-row"><span>${t("map.customKey")} :</span> <b>${esc(p.key)}</b></div>` : ""}
-          ${p.iconType === "custom" && p.iconUrl ? `<div class="cpp-img"><img src="${p.iconUrl}" alt="custom icon"></div>` : ""}
+          ${p.iconType === "custom" && p.iconUrl ? `<div class="cpp-img"><img src="${p.iconUrl}" alt=""></div>` : ""}
         </div>`;
         marker.bindPopup(popup);
         // Clic droit sur le point : on écoute directement l'élément de l'icône. C'est le seul moyen
@@ -1066,7 +1066,7 @@
           <datalist id="keys-list">${Object.values(TT.store.S.idx?.items || {}).filter(i => i.name).map(i => `<option value="${i.name}"></option>`).join("")}</datalist>
         </label>
         <label>${t("map.customIcon")} : 
-          <select id="cp-icon">${CUSTOM_ICONS.map(ic => `<option value="${ic.type}" ${pt.iconType === ic.type ? "selected" : ""}>${ic.label}</option>`).join("")}</select>
+          <select id="cp-icon">${CUSTOM_ICONS.map(ic => `<option value="${ic.type}" ${pt.iconType === ic.type ? "selected" : ""}>${t("map.icon." + ic.type)}</option>`).join("")}</select>
           <input id="cp-img-url" class="txt" type="url" placeholder="${t("map.customIconImg.ph")}" value="${esc(pt.iconUrl || "")}"></label>
         <div class="cp-pos">${t("map.customPos", { x: pt.x, y: pt.y })}</div>
         <div class="cp-ctr"><button id="cp-ok" class="btn primary">${cpEditing ? t("map.customSave") : t("map.customAdd")}</button><button id="cp-cancel" class="btn">${t("map.cancel")}</button></div>

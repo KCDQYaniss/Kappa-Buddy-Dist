@@ -28,7 +28,7 @@ w.__TAURI__ = {
       if (cmd === "get_state") return { screenshots_dir: "C:/s", logs_dir: null, delete_screenshots: false, lang: "fr", game_mode: "PvP", always_on_top: false, auto_start: false, close_to_tray: false, start_minimized: false, check_updates: true, map: null, position: null, warnings: [] };
       if (cmd === "check_update") return updatePayload;
       if (cmd === "install_update") { if (updateFails) throw new Error("The signature verification failed"); return null; }
-      if (cmd === "open_releases") return "https://github.com/KCDQYaniss/Tarkov-Tracker/releases/latest";
+      if (cmd === "open_releases") return "https://github.com/KCDQYaniss/Kappa-Buddy-Dist/releases/latest";
       if (cmd === "load_cache") return fixtureText;
       if (cmd === "load_progress") return null;
       if (cmd === "rescan_quests") return { events: [{ id: HIST_B, status: "started", at: 1000 }, { id: HIST_A, status: "started", at: 900 }], files: 3, sessions: 2 };

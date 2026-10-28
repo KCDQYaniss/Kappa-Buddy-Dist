@@ -12,6 +12,9 @@ use std::path::Path;
 /// Script PowerShell embarqué : lit les langues OCR du profil, décode l'image, renvoie les lignes.
 const PS: &str = r#"
 $ErrorActionPreference = 'Stop'
+# Sans ceci, PowerShell encode sa sortie dans la page de code OEM (ex: CP850 sur un
+# Windows français) et les accents reconnus par l'OCR arrivent mojibake côté Rust.
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Runtime.WindowsRuntime | Out-Null
 $asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1' })[0]
 function Await($t, $rt) { $net = $asTaskGeneric.MakeGenericMethod($rt).Invoke($null, @($t)); $net.Wait(-1) | Out-Null; $net.Result }
@@ -84,8 +87,8 @@ pub fn read_lines(path: &Path) -> Result<Vec<String>, String> {
     let stdout = String::from_utf8_lossy(&out.stdout);
     if stdout.contains("__NO_LANGUAGES__") || stdout.contains("__NO_ENGINE__") {
         return Err(
-            "OCR Windows indisponible : installe une langue puis un module d'imprétrature \
-             (Paramètres > Heure & langue > Langue, ex: Français/English)."
+            "OCR Windows indisponible : installe une langue puis son module de reconnaissance \
+             (Paramètres > Heure & langue > Langue, ex : Français/English)."
                 .to_string(),
         );
     }

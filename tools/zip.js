@@ -14,11 +14,25 @@ const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"))
 const CANDIDATE_DIRS = [path.join(ROOT, "target", "release"), path.join(ROOT, "src-tauri", "target", "release")];
 
 function findExe() {
+  // Nom du produit dans tauri.conf.json (rebrand : Kappa Buddy), normalisé
+  // sans espaces ; on accepte encore l'ancien nom de binaire (« tarkovtracker »)
+  // tant qu'un build 0.9.x peut repasser par cet outil.
+  let want = "";
+  try {
+    const conf = JSON.parse(fs.readFileSync(path.join(ROOT, "src-tauri", "tauri.conf.json"), "utf8"));
+    want = String(conf.productName || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  } catch {
+    want = "";
+  }
   for (const dir of CANDIDATE_DIRS) {
     if (!fs.existsSync(dir)) continue;
     const cands = fs.readdirSync(dir).filter((f) => f.toLowerCase().endsWith(".exe"));
     // Le binaire principal ne porte pas le suffixe des outils de compilation.
-    const main = cands.find((f) => /tarkov/i.test(f) && !/build-script|setup|uninstall/i.test(f));
+    const main = cands.find((f) => {
+      if (/build-script|setup|uninstall/i.test(f)) return false;
+      const norm = f.toLowerCase().replace(/[^a-z0-9]/g, "");
+      return (want && norm === want) || norm === "tarkovtracker";
+    });
     if (main) return path.join(dir, main);
   }
   return null;
@@ -36,7 +50,7 @@ function main() {
   fs.rmSync(stage, { recursive: true, force: true });
   fs.mkdirSync(stage, { recursive: true });
 
-  fs.copyFileSync(exe, path.join(stage, "TarkovTracker.exe"));
+  fs.copyFileSync(exe, path.join(stage, "KappaBuddy.exe"));
   for (const doc of ["README.md", "CREDITS.md", "CHANGELOG.md"]) {
     const src = path.join(ROOT, doc);
     if (fs.existsSync(src)) fs.copyFileSync(src, path.join(stage, doc));
@@ -45,9 +59,9 @@ function main() {
   fs.writeFileSync(
     path.join(stage, "LISEZ-MOI.txt"),
     [
-      "Tarkov Tracker " + pkg.version,
+      "Kappa Buddy " + pkg.version,
       "",
-      "Lance TarkovTracker.exe. Aucune installation n'est nécessaire.",
+      "Lance KappaBuddy.exe. Aucune installation n'est nécessaire.",
       "Windows 10/11 avec WebView2 (présent par défaut sur Windows 11 et la plupart des Windows 10).",
       "",
       "Au premier lancement, l'app télécharge les données du jeu (quelques dizaines de secondes).",
@@ -58,7 +72,7 @@ function main() {
     "utf8"
   );
 
-  const zip = path.join(dist, `TarkovTracker-${pkg.version}-portable.zip`);
+  const zip = path.join(dist, `KappaBuddy-${pkg.version}-portable.zip`);
   fs.rmSync(zip, { force: true });
   // Compress-Archive est présent sur Windows PowerShell 5+.
   execFileSync("powershell", ["-NoProfile", "-Command", `Compress-Archive -Path '${stage}\\*' -DestinationPath '${zip}' -Force`], { stdio: "inherit" });

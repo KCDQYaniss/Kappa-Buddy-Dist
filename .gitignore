@@ -4,3 +4,16 @@ src-tauri/gen/
 dist/
 
 tests/_chain.txt
+
+# Secrets et credentials — jamais dans le dépôt
+.dev.vars
+.dev.vars.*
+.kappa/
+*.key
+*.pem
+.env
+.env.*
+
+# Débris locaux (logs de l'app, brouillons)
+logs.txt
+temp_fix.txt

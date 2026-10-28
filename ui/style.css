@@ -79,6 +79,7 @@
   --panel-2: rgba(14, 14, 40, 0.74);
   /* Police cyberpunk */
   font-family: "Orbitron", "Chakra Petch", "Bahnschrift", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
 }
 
 /* Styles spécifiques au thème cyberpunk */
@@ -303,6 +304,8 @@
 /* Carte éclaircie : les cartes de jeu sont sombres ; un filtre les éclaircit d'un cran. */
 .map-view.map-bright .leaflet-image-layer,
 .map-view.map-bright .leaflet-tile { filter: brightness(1.22) saturate(0.92) contrast(0.98); }
+
+body {
   font-family: "Chakra Petch", "Bahnschrift", "Segoe UI", system-ui, sans-serif;
   font-size: 14px;
   color-scheme: dark;

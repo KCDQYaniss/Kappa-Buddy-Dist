@@ -35,7 +35,7 @@ const LEGACY_ENDPOINT = (() => {
 function fetchBuffer(url, accept, hops = 0) {
   return new Promise((resolve, reject) => {
     if (hops > 6) return reject(new Error("trop de redirections"));
-    https.get(url, { headers: { "User-Agent": "tarkov-tracker-verify", Accept: accept || "*/*", "Cache-Control": "no-cache" } }, (res) => {
+    https.get(url, { headers: { "User-Agent": "kappa-buddy-verify", Accept: accept || "*/*", "Cache-Control": "no-cache" } }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         res.resume();
         return resolve(fetchBuffer(res.headers.location, accept, hops + 1));

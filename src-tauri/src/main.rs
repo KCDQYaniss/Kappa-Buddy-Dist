@@ -214,7 +214,7 @@ fn build_overlay_cfg(s: &Settings) -> serde_json::Value {
  * l'OCR permanent en pleine partie est inacceptable. Chaque déclenchement du
  * mode auto suit un déplacement RÉEL du curseur (seuil proportionnel à la
  * résolution, façon échelle du tooltip EFT), filtré par un intervalle
- * minimal. Arrêné → zéro capture. */
+ * minimal. Arrêté → zéro capture. */
 static AUTO_ENABLED: AtomicBool = AtomicBool::new(false);
 static AUTO_LAST_FIRE_MS: AtomicU64 = AtomicU64::new(0);
 static AUTO_LAST_CURSOR: Mutex<Option<(i32, i32)>> = Mutex::new(None);
@@ -227,7 +227,7 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-/// Le seuiil de déplacement (px) au-delà duquel on considère un nouvel objet.
+/// Le seuil de déplacement (px) au-delà duquel on considère un nouvel objet.
 /// ~28px à 1080p, ~37 à 1440p, ~56 en 4K — au rayon d'un « objet de base ».
 fn auto_move_threshold() -> i32 {
     let scale = (overlay::primary_monitor_width() as f64 / 1920.0).max(1.0);
@@ -552,7 +552,7 @@ fn snapshot(st: &AppState) -> StateDto {
         overlay_text_scale: s.overlay_text_scale(),
         overlay_anchor: s.overlay_anchor(),
         overlay_sections: s.overlay_sections.clone().unwrap_or_else(|| {
-            ["flea", "flea_history", "traders", "traders_all", "slot", "quests", "barter", "barter_using", "hideout", "crafts", "caliber"]
+            ["flea", "flea_history", "traders", "traders_all", "slot", "quests", "barter", "barter_using", "hideout", "crafts"]
                 .iter()
                 .map(|k| k.to_string())
                 .collect()
@@ -585,21 +585,27 @@ fn save_settings_file(app: &AppHandle, settings: &Settings) -> Result<(), String
     Ok(())
 }
 
+/// Entrée de démarrage automatique dans HKCU\…\Run. Rebrandée pour 1.0.0 :
+/// l'ancien nom (≤ 0.9.x) « TarkovTracker » est migré au lancement
+/// (migrate_legacy_auto_start) pour ne pas perdre l'autostart des installs
+/// existantes au passage à 1.0.0.
+const AUTO_START_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
+const AUTO_START_NAME: &str = "KappaBuddy";
+const AUTO_START_LEGACY: &str = "TarkovTracker";
+
 /// Active/désactive le démarrage automatique avec Windows (entrée « Run » du registre, utilisateur courant).
 #[cfg(windows)]
 fn apply_auto_start(on: bool) {
-    const KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
-    const NAME: &str = "TarkovTracker";
     let mut cmd = std::process::Command::new("reg");
     if on {
         match std::env::current_exe() {
             Ok(exe) => {
-                cmd.args(["add", KEY, "/v", NAME, "/t", "REG_SZ", "/d", &format!("\"{}\"", exe.display()), "/f"]);
+                cmd.args(["add", AUTO_START_KEY, "/v", AUTO_START_NAME, "/t", "REG_SZ", "/d", &format!("\"{}\"", exe.display()), "/f"]);
             }
             Err(_) => return,
         }
     } else {
-        cmd.args(["delete", KEY, "/v", NAME, "/f"]);
+        cmd.args(["delete", AUTO_START_KEY, "/v", AUTO_START_NAME, "/f"]);
     }
     let _ = cmd.output();
 }
@@ -608,19 +614,79 @@ fn apply_auto_start(on: bool) {
 fn apply_auto_start(_on: bool) {}
 
 #[cfg(windows)]
-fn auto_start_enabled() -> bool {
-    const KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
+fn run_value_exists(value: &str) -> bool {
     std::process::Command::new("reg")
-        .args(["query", KEY, "/v", "TarkovTracker"])
+        .args(["query", AUTO_START_KEY, "/v", value])
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)
+}
+
+#[cfg(windows)]
+fn auto_start_enabled() -> bool {
+    run_value_exists(AUTO_START_NAME)
 }
 
 #[cfg(not(windows))]
 fn auto_start_enabled() -> bool {
     false
 }
+
+/// Migration du nom d'entrée d'autostart après le rebrand : si une entrée
+/// « TarkovTracker » existe encore (install 0.9.x mise à jour), elle est
+/// supprimée ; si elle pointait vers CE binaire (même application, mise à
+/// jour), l'autostart est restauré sous le nouveau nom. Idempotent.
+#[cfg(windows)]
+fn migrate_legacy_auto_start() {
+    if !run_value_exists(AUTO_START_LEGACY) {
+        return;
+    }
+    let mut legacy_exe = None;
+    if let Ok(out) = std::process::Command::new("reg")
+        .args(["query", AUTO_START_KEY, "/v", AUTO_START_LEGACY])
+        .output()
+    {
+        if out.status.success() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            legacy_exe = text.lines().find_map(|l| {
+                let line = l.trim();
+                if !(line.starts_with(AUTO_START_LEGACY) && line.contains("REG_SZ")) {
+                    return None;
+                }
+                let raw = line.split("REG_SZ").nth(1)?.trim().trim_matches('"');
+                (!raw.is_empty()).then(|| raw.to_string())
+            });
+        }
+    }
+    let _ = std::process::Command::new("reg")
+        .args(["delete", AUTO_START_KEY, "/v", AUTO_START_LEGACY, "/f"])
+        .output();
+    if let Some(old) = legacy_exe {
+        let same = std::env::current_exe()
+            .map(|e| e == std::path::PathBuf::from(&old))
+            .unwrap_or(false);
+        if same {
+            if let Ok(exe) = std::env::current_exe() {
+                let _ = std::process::Command::new("reg")
+                    .args([
+                        "add",
+                        AUTO_START_KEY,
+                        "/v",
+                        AUTO_START_NAME,
+                        "/t",
+                        "REG_SZ",
+                        "/d",
+                        &format!("\"{}\"", exe.display()),
+                        "/f",
+                    ])
+                    .output();
+            }
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn migrate_legacy_auto_start() {}
 
 /// Applique l'état « toujours au premier plan » à la fenêtre principale (utile pendant un raid).
 fn apply_always_on_top(app: &AppHandle, on: bool) {
@@ -640,16 +706,22 @@ fn show_main(app: &AppHandle) {
 
 /// Icône de la zone de notification : menu « Afficher / Quitter », clic gauche pour rouvrir.
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
-    let show = MenuItem::with_id(app, "show", "Afficher Tarkov Tracker", true, None::<&str>)?;
+    let show = MenuItem::with_id(app, "show", "Afficher Kappa Buddy", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quitter", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &quit])?;
     let mut builder = TrayIconBuilder::with_id("main")
-        .tooltip("Tarkov Tracker")
+        .tooltip("Kappa Buddy")
         .menu(&menu)
         .show_menu_on_left_click(false)
+        // Un seul handler : en Tauri 2, un second on_menu_event REMPLACE le premier
+        // (« Afficher » serait resté mort). La fermeture nettoie l'overlay (fenêtre + sidecar).
         .on_menu_event(|app, ev| match ev.id().as_ref() {
             "show" => show_main(app),
-            "quit" => app.exit(0),
+            "quit" => {
+                println!("[main] Quitting - cleaning up overlay");
+                let _ = overlay::cleanup(app);
+                app.exit(0);
+            }
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
@@ -660,14 +732,6 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     if let Some(icon) = app.default_window_icon() {
         builder = builder.icon(icon.clone());
     }
-    // Handler de fermeture : nettoie l'overlay (cache la fenêtre + tue le sidecar)
-    builder = builder.on_menu_event(|app, ev| {
-        if ev.id().as_ref() == "quit" {
-            println!("[main] Quitting - cleaning up overlay");
-            let _ = overlay::cleanup(app);
-            app.exit(0);
-        }
-    });
     builder.build(app)?;
     Ok(())
 }
@@ -1096,6 +1160,10 @@ fn main() {
         .setup(|app| {
             let handle = app.handle().clone();
 
+            // Migration de l'entrée d'autostart (rebrand 1.0.0) : no-op si
+            // rien à migrer.
+            migrate_legacy_auto_start();
+
             // Check and download sidecar automatically at startup
             tauri::async_runtime::spawn_blocking(move || {
                 let exe_path = std::env::current_exe().unwrap_or_default();
@@ -1230,5 +1298,5 @@ fn main() {
             debug_overlay_test,
         ])
         .run(tauri::generate_context!())
-        .expect("erreur au lancement de Tarkov Tracker");
+        .expect("erreur au lancement de Kappa Buddy");
 }

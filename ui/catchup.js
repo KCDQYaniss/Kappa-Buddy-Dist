@@ -42,7 +42,7 @@
       return;
     }
     const list = quests();
-    $("cu-count").textContent = t("i.count", { n: list.length });
+    $("cu-count").textContent = t("q.count", { n: list.length });
     const shown = list.slice(0, MAX);
     $("cu-list").innerHTML = shown.map((x) => {
       const s = st.stateOf(x), fin = s === "finished", lck = s === "locked";

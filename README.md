@@ -1,13 +1,10 @@
-<<<<<<< HEAD
-# Tarkov-Tracker
-=======
-# Tarkov Tracker
+# Kappa Buddy
 
 Compagnon pour Escape from Tarkov : position en direct sur la carte, suivi de quêtes synchronisé avec les logs du jeu,
 et base de données des objets, conteneurs et loot au sol. Conçu pour peser le moins possible à côté de Tarkov.
 
-> Nouveautés de la version 0.7 : **mises à jour automatiques**, interface **entièrement traduite** (fr/en/de/es/ru),
-> **visite guidée** au premier lancement, mémoire de la dernière carte et des filtres. Détail dans [CHANGELOG.md](CHANGELOG.md).
+> **Mises à jour automatiques** intégrées, interface entièrement traduite (fr/en/de/es/ru), visite guidée au premier
+> lancement, overlay prix au survol et recherche globale (`Ctrl+F`). Historique complet : [CHANGELOG.md](CHANGELOG.md).
 
 ## Fonctions
 
@@ -47,7 +44,7 @@ et base de données des objets, conteneurs et loot au sol. Conçu pour peser le 
 **Overlay objet (au survol et à la recherche)**
 - Passe la souris sur un objet dans la liste : une fiche compacte suit le curseur avec le **prix flea**, le **meilleur marchand** chez qui le revendre
   et, si l'objet sert à une quête en cours, la quantité à trouver.
-- `Ctrl+F` (ou `Ctrl+F`) ouvre une **recherche globale** (objets, quêtes, cartes) : tape un nom, clique un objet et tu vois sa fiche complète —
+- `Ctrl+F` ouvre une **recherche globale** (objets, quêtes, cartes) : tape un nom, clique un objet et tu vois sa fiche complète —
   prix, marchand, hideout, quêtes, où le trouver. C'est l'overlay à garder au-dessus du jeu.
 
 **Confort**
@@ -60,6 +57,8 @@ et base de données des objets, conteneurs et loot au sol. Conçu pour peser le 
 - Notifications vertes (information) et orange (attention). Réglages et diagnostic en un clic (roue dentée).
 
 ## Lancer
+
+Pour compiler ou contribuer. Pour installer l'application, télécharge l'installateur (voir [DISTRIBUTION.md](DISTRIBUTION.md)).
 
 Prérequis (Windows 10/11) : [Rust](https://rustup.rs) >= 1.90, [Node.js](https://nodejs.org),
 WebView2 (déjà présent sur Windows 11 et la plupart des Windows 10), Visual Studio Build Tools (charge « C++ »).
@@ -83,13 +82,10 @@ Pour préparer une version à distribuer, voir **[DISTRIBUTION.md](DISTRIBUTION.
 pas**, classé par gravité : *Bloquant* (ce qui empêche la détection), *À vérifier* (ce qui peut gêner) et *OK*. Chaque point explique ce qui a été
 observé et **quoi faire**. Le diagnostic s'ouvre et se lance même tout seul quand un problème est déjà connu (par exemple : logs introuvables).
 
-Si tu as besoin d'aide, clique sur **Copier le rapport** et envoie-le : il contient le détail (identifiants du jeu masqués automatiquement).
+Si tu as besoin d'aide, clique sur **Copier le rapport** et joins-le à ta demande : il contient le détail (identifiants du jeu masqués automatiquement).
 
 Causes les plus courantes quand les quêtes ne se synchronisent pas : le dossier des logs n'est pas le bon, aucune partie n'a été lancée depuis
 l'ouverture de l'app, ou aucune quête n'a été démarrée/terminée dans la dernière session. Le diagnostic le dit précisément.
-
-Bug corrigé en v0.5 : les versions récentes du jeu nomment le fichier `notifications_000.log` (avec un suffixe de rotation) et l'app ne reconnaissait
-que `notifications.log`. Les suffixes `_000`, `_001`… sont désormais acceptés pour tous les fichiers de logs.
 
 Limites connues : le jeu ne garde qu'un nombre limité de sessions de logs, donc l'historique est partiel pour un compte ancien (la déduction des
 prérequis comble le reste). Les logs ne distinguent pas toujours un profil PvP d'un profil PvE : si tu joues les deux, les quêtes des deux se mélangent.
@@ -101,7 +97,7 @@ Même diagnostic (**Réglages > Diagnostic (débogage) > Analyser**). Causes les
 - **Dossier des logs introuvable** : colle-le dans Réglages. Avec Steam c'est en général `…\steamapps\common\Escape from Tarkov\build\Logs`.
   L'app cherche aussi via le registre, les bibliothèques Steam et les emplacements habituels du launcher (`Logs` et `build\Logs`).
 - **Aucune ligne de map dans le log** : elle apparaît au chargement d'un raid. Lance une partie puis relance le diagnostic.
-- **Map inconnue** : le diagnostic affiche son identifiant, envoie-le moi.
+- **Map inconnue** : le diagnostic affiche son identifiant : signale-le avec ton rapport.
 
 Les logs sont surveillés par les notifications de Windows **et** relus toutes les 1,5 s (deux appels système par fichier, aucune lecture tant que
 la taille n'a pas changé) : Windows ne prévient pas toujours quand le jeu ajoute des lignes à un fichier qu'il garde ouvert.
@@ -109,7 +105,7 @@ la taille n'a pas changé) : Windows ne prévient pas toujours quand le jeu ajou
 ## D'où viennent les données
 
 Les quêtes, objets, cartes, extractions, conteneurs, loot au sol et **stations du hideout** viennent de **json.tarkov.dev**, les fichiers JSON qui
-alimentent le site tarkov.dev. L'ancienne API GraphQL (api.tarkov.dev) est hors service depuis juillet et n'est plus utilisée. Les fichiers sont gros
+alimentent le site tarkov.dev. L'ancienne API GraphQL (api.tarkov.dev) est hors service et n'est plus utilisée. Les fichiers sont gros
 (cartes ~9,5 Mo, objets ~17 Mo) : l'app les lit en flux, les réduit à ce dont elle a besoin et ne garde que ce résumé sur le disque. Les textes sont
 des clés de traduction, résolues avec les fichiers `_fr` (ou `_en` si la langue manque).
 
@@ -125,11 +121,11 @@ données (quêtes avec marchand, conteneurs nommés, catégories d'objets…) po
 
 ## À vérifier à la première utilisation
 
-Le code est testé (Rust, interface, synchro), mais je n'ai pas pu lancer Tarkov ni télécharger les vrais fichiers de données.
+Le code est testé (Rust, interface, synchro) et ces points sont surveillés à chaque version. Si un champ semble mal lu, le diagnostic montre quoi vérifier.
 
 1. **Structure des fichiers json.tarkov.dev** : déduite de projets qui les lisent pour de vrai, avec une conversion tolérante (champ absent ou
    inattendu = ignoré). Surveille dans le diagnostic : les **conteneurs nommés** (sinon « Conteneur 5789… », mais filtrables), les **catégories
-   d'objets** et les **quêtes avec marchand**. S'il y a un 0 suspect, envoie-moi le diagnostic.
+   d'objets** et les **quêtes avec marchand**. S'il y a un 0 suspect, copie le rapport du diagnostic pour ta demande d'aide.
 2. **Format de `notifications_000.log`** : type 10/11/12 et identifiant de quête au début de `templateId`, d'après TarkovMonitor.
 3. **Identifiants de map** marqués `(?)` dans `crates/core/src/maps.rs` (Labyrinth, Terminal, Icebreaker).
 4. **Étages** : les niveaux et les plages de hauteur viennent de tarkov.dev. La hauteur est approximative (des niveaux se chevauchent) : le mode Auto
@@ -161,4 +157,8 @@ L'interface reprend le langage visuel des menus du jeu, avec les couleurs relev�
 navigation noire en bas, onglet actif crème, badge vert lime, bandeau orange pour les alertes. Aucun asset de Battlestate Games n'est utilisé. La
 police du jeu (Bender) est propriétaire : l'app embarque **Chakra Petch** (SIL OFL), la plus proche parmi les polices libres. Tout est dans
 `ui/style.css` (variables de couleur en tête de fichier).
->>>>>>> 509d8b2 (v0.9: Fix overlay window visibility and autohide - Hidden overlay at startup - Added SW_HIDE Win32 call for reliable hiding - hwnd_visible() helper using IsWindowVisible - autohide integrated with toggle-show)
+
+## Mentions
+
+Kappa Buddy est un outil communautaire non officiel : il n'est ni affilié à, ni approuvé par, ni sponsorisé par Battlestate Games.
+Escape from Tarkov est une marque de Battlestate Games. Licences des données, des cartes et des polices : [CREDITS.md](CREDITS.md).

@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Tarkov Tracker",
+  "productName": "Kappa Buddy",
   "version": "0.9.19",
   "identifier": "dev.tarkovtracker.app",
   "build": {
@@ -11,7 +11,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Tarkov Tracker",
+        "title": "Kappa Buddy",
         "width": 1280,
         "height": 800,
         "minWidth": 1280,
@@ -21,7 +21,7 @@
       },
       {
         "label": "overlay",
-        "title": "Overlay",
+        "title": "Kappa Buddy Overlay",
         "url": "overlay.html",
         "width": 324,
         "height": 170,

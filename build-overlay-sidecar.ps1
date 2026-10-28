@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Build the tarkov-server sidecar (FastAPI OCR service) for Tarkov Tracker.
+  Build the tarkov-server sidecar (FastAPI OCR service) for Kappa Buddy.
   Requires Python 3.12 (3.11 also works). Install from python.org first.
 
 .EXAMPLE
@@ -11,7 +11,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$Root = "C:\Users\Sinqy\Documents\tarkov-tracker"
+$Root = $PSScriptRoot
 $OverlayDev = "$Root\tarkov-price-overlay-dev\tarkov-price-overlay"
 $InternalDir = "$Root\src-tauri\_internal"
 

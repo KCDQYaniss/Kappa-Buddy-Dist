@@ -103,7 +103,7 @@ function main() {
   // 6) Archive portable (repli sans installateur), puis manifeste de mise à jour.
   execFileSync("node", [path.join(ROOT, "tools", "zip.js")], { cwd: ROOT, stdio: "inherit" });
 
-  const notes = changelogNotes(version) || cfg.notes || "";
+  const notes = changelogNotes(version) || cfg.notes || `Version ${version}`;
   const latest = {
     version,
     notes,

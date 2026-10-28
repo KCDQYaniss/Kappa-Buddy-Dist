@@ -111,7 +111,7 @@
     if (d.needed) h += `<div class="lc-need">${t("i.forQuests")} : × ${d.needed.count}${d.needed.fir ? ` (${t("i.fir")})` : ""}</div>`;
     if (d.quests.length) h += `<h4>${t("i.allQuests")}</h4><div class="lc-links">` + d.quests.slice(0, 6).map((q) =>
       `<button type="button" class="link st-${st.esc(q.state)}" data-task="${st.esc(q.id)}">${st.esc(q.name)}${q.fir ? " (FIR)" : ""}</button>`).join("") + "</div>";
-    if (d.hideout.length) h += `<h4>${t("i.hideout")}</h4><div class="lc-links">` + d.hideout.slice(0, 8).map((u) =>
+    if (d.hideout.length) h += `<h4>${t("i.hideoutSection")}</h4><div class="lc-links">` + d.hideout.slice(0, 8).map((u) =>
       `<span class="link">${st.esc(u.station)} <em>niv. ${u.level} · × ${u.count}${u.fir ? " FIR" : ""}</em></span>`).join("") + "</div>";
     if (d.maps.length) h += `<h4>${t("i.loot")}</h4><div class="lc-links">` + d.maps.slice(0, 6).map((m) =>
       `<button type="button" class="link" data-loc="${st.esc(m.slug)}">${st.esc(m.name)} <em>${m.count}</em></button>`).join("") + "</div>";
@@ -144,27 +144,10 @@
 
   /* ---------- Cursor Overlay (style Blitz) ---------- */
   let cursorOverlay = null;
-  let cursorOverlayEnabled = false;
 
   function getCursorOverlay() {
     if (!cursorOverlay) cursorOverlay = document.getElementById("cursor-overlay");
     return cursorOverlay;
-  }
-
-  function formatPrice(price) {
-    if (price == null || price === 0) return "—";
-    return price.toLocaleString(navigator.language || "fr-FR") + " ₽";
-  }
-
-  // Trigger a one-shot capture + OCR via the Rust side (bound to the F2 hotkey
-  // at the native level). There is no polling loop: each press does a single
-  // capture pass (~1s) and shows the card at the top-left corner.
-  async function lookupItemFromOCR() {
-    try {
-      return await invoke("capture_overlay");
-    } catch (e) {
-      console.error("[overlay] capture failed:", e);
-    }
   }
 
   // Hide the main-window placeholder overlay (the real card lives in the
@@ -315,29 +298,6 @@
     d.hints.forEach((h) => L.push("  - " + h));
     if (d.recent_lines.length) { L.push("", t("diag.recentLogLines") + " :"); d.recent_lines.forEach((l) => L.push("  " + l)); }
     if (d.tried.length) { L.push("", t("diag.checkedPaths") + " :"); d.tried.slice(0, 12).forEach((tp) => L.push("  " + tp)); }
-    return L.join("\n");
-  }
-  function fmtDiag(d) {
-    const L = [];
-    L.push(`Dossier des logs : ${d.logs_dir || "introuvable"} (${d.logs_dir_source})`);
-    L.push(`Sessions de logs : ${d.sessions}${d.latest_session ? " · dernière : " + d.latest_session : ""}`);
-    if (d.files.length) {
-      L.push("Fichiers de la dernière session :");
-      d.files.forEach((f) => L.push(`  ${f.name} · ${fmtBytes(f.bytes)} · modifié ${f.modified_secs_ago == null ? "?" : "il y a " + f.modified_secs_ago + " s"}`));
-    }
-    L.push(`Dernière map trouvée dans les logs : ${d.last_map_raw ? d.last_map_raw + " → " + (d.last_map_slug || "non reconnue") : "aucune"}`);
-    L.push(`Lignes « Location: » : ${d.location_lines}`);
-    L.push(`Évènements de quête (dernière session) : ${d.task_events_latest_session}`);
-    const dq = TT.store.S.data && TT.store.S.data.quality;
-    L.push(dq
-      ? `Données (json.tarkov.dev) : ${dq.tasks} quêtes dont ${dq.tasks_with_trader} avec marchand ; ${dq.objectives_with_zone}/${dq.objectives} objectifs placés sur une carte ; ${dq.items} objets (${dq.items_with_category} avec catégorie, ${dq.items_with_price} avec prix) ; ${dq.maps} cartes, ${dq.extracts} extractions, ${dq.containers} conteneurs (${dq.containers_named} nommés), ${dq.loose_points} emplacements de loot au sol, ${dq.locks || 0} verrous ; hideout : ${dq.hideout_stations || 0} station(s), ${dq.hideout_items || 0} objet(s) requis`
-      : "Données : pas encore téléchargées (ou ancien format)");
-    L.push(`Dernier évènement de map reçu par l'app : ${lastMapEvent || "aucun depuis le lancement"}`);
-    L.push(`Captures : ${d.screenshots_dir} (${d.screenshots_dir_exists ? "existe" : "absent"})${d.newest_screenshot ? " · la plus récente : " + d.newest_screenshot : ""}`);
-    L.push("", "Conclusion :");
-    d.hints.forEach((h) => L.push("  - " + h));
-    if (d.recent_lines.length) { L.push("", "Dernières lignes du log (identifiants masqués) :"); d.recent_lines.forEach((l) => L.push("  " + l)); }
-    if (d.tried.length) { L.push("", "Emplacements vérifiés automatiquement :"); d.tried.slice(0, 12).forEach((t) => L.push("  " + t)); }
     return L.join("\n");
   }
   async function runDiag() {
@@ -516,7 +476,6 @@
       applyModeUi(state.game_mode);
       // Apply cursor overlay setting
       if (!DEMO) {
-        cursorOverlayEnabled = state.cursor_overlay_enabled;
         try {
           // toggle_overlay(active=true) starts the sidecar + shows the fixed card.
           // toggle_overlay(false) stops the sidecar. The capture itself is fired
@@ -647,7 +606,7 @@
     const ready = TT.store.load();
     await listen("position", (e) => TT.mapview.onPosition(e.payload));
     await listen("map", (e) => {
-      lastMapEvent = `${e.payload.raw} → ${e.payload.slug || "non reconnue"}${e.payload.from_scene ? " (via la scène chargée)" : ""} à ${new Date().toLocaleTimeString("fr-FR")}`;
+      lastMapEvent = `${e.payload.raw} → ${e.payload.slug || t("diag.unknown")}${e.payload.from_scene ? " " + t("map.viaScene") : ""} · ${new Date().toLocaleTimeString()}`;
       TT.mapview.onMap(e.payload);
     });
     await listen("warning", (e) => TT.warn(e.payload));

@@ -523,7 +523,7 @@
 
   if (T) T.event.listen("game_mode_changed", (e) => { setGameMode(e.payload); });
 
-  const MODE_LABEL = { PvP: "PvP", PvE: "PvE", Season: t("store.season") };
+  const MODE_LABEL = { PvP: "PvP", PvE: "PvE", get Season() { return t("store.season"); } };
 
   TT.store = {
     S, setLang, setGameMode, MODE_LABEL, lookupItem, searchAll, emptyMessage, esc, fmtPrice, ago, agoMs, hhmm, slugOf, load, refresh, setData,
