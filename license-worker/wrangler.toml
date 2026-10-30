@@ -9,11 +9,11 @@ compatibility_date = "2026-10-01"
 # et récupérable via my-games quand la page existera. "" = worker dégradé
 # (health 503, activations refusées avec config_error) : voulu, pour
 # qu'un déploiement prématuré ne céderait aucune licence.
-GAME_ID = ""
+GAME_ID = "5263695"
 MAX_BINDS = 1                 # appareils par clé (décision : 1)
 SWAP_COOLDOWN_DAYS = 30       # délai minimum entre deux swaps self-service
 
 [[d1_databases]]
 binding = "DB"
 database_name = "kappa-license"
-database_id = "À-REMPLIR-SORTIE-WRANGLER-D1-CREATE"
+database_id = "56ee8775-2276-4b70-a006-50d809410122"

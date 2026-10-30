@@ -29,7 +29,7 @@ use tauri::{AppHandle, Manager};
 /// URL du Worker de licence (Cloudflare). À ajuster une seule fois au
 /// déploiement (`npx wrangler deploy` dans license-worker/) — c'est la seule
 /// constante à tenir à jour entre le déploiement et l'app.
-const WORKER_URL: &str = "https://kappa-license.kappa-buddy.workers.dev";
+const WORKER_URL: &str = "https://kappa-license.eltomyyaniss.workers.dev";
 
 /// Clé publique Ed25519 du Worker (32 octets bruts). La privée vit dans le
 /// secret Cloudflare `LICENSE_PRIVATE_PKCS8_B64`, JAMAIS dans le dépôt.

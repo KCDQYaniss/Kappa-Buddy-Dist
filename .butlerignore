@@ -1,0 +1,6 @@
+*
+!target
+!dist
+!tools
+!package.json
+!src-tauri/tauri.conf.json

@@ -14,7 +14,7 @@
   const invoke = T ? T.core.invoke : null;
   // Page itch.io : renseignée à la mise en vente. Vide = bouton d'achat caché
   // (jamais de lien mort dans l'app).
-  const ITCH_URL = "";
+  const ITCH_URL = "https://kappa-buddy.itch.io/kappa-buddy";
 
   /** État de fond (steady) : licensed | trial | expired. */
   let steady = null;
