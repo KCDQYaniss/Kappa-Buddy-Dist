@@ -42,8 +42,6 @@ function main() {
   const cfg = repoConfig();
   const version = requireSyncedVersion();
   const tag = `v${version}`;
-  const endpoint = `https://github.com/${cfg.repo}/releases/latest/download/latest.json`;
-
   // 1) L'application interroge cette adresse : on la garde synchronisée avec le dépôt.
   // Déploiement Itch : les updates sont hébergés sur itch.io via Butler.
   // Le manifeste latest.json est signé localement (minisign), l'URL indique juste

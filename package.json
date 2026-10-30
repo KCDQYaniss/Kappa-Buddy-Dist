@@ -1,6 +1,6 @@
 {
   "name": "kappa-buddy",
-  "version": "0.9.19",
+  "version": "1.0.0",
   "private": true,
   "engines": {
     "node": ">=18"

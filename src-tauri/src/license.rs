@@ -207,7 +207,7 @@ fn verify_token(token: &str, device_fp: &str) -> Result<Value, String> {
         return Err(code("license.err.badToken"));
     }
 
-    use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+    use ed25519_dalek::{Signature, VerifyingKey};
     let mut raw = [0u8; 32];
     hex_to_bytes(PUB_KEY_RAW_HEX, &mut raw).map_err(|_| code("license.err.badToken"))?;
     let vk = VerifyingKey::from_bytes(&raw).map_err(|_| code("license.err.badToken"))?;

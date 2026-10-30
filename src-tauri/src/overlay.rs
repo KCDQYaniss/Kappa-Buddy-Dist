@@ -752,20 +752,18 @@ pub fn download_latest_sidecar() -> Result<(), String> {
     let sidecar_path = internal_dir.join("tarkov-server.exe");
 
     // Extract zip archive using PowerShell
-    println!("[overlay] Extracting archive with PowerShell...");
-    use std::process::Command;
+    println!("[overlay] Extracting archive with zip crate (Rust native, no PowerShell)...");
+    use std::fs::File;
+    use std::io::BufReader;
+
     let extract_dir = temp_dir.join("extracted");
-    std::fs::create_dir_all(&extract_dir).ok();
+    std::fs::create_dir_all(&extract_dir).map_err(|e| msg("ov.tempDir", serde_json::json!({"e": e.to_string()})))?;
 
-    let ps_result = Command::new("powershell")
-        .args(&["-Command", &format!("Expand-Archive -Path '{}' -DestinationPath '{}' -Force", zip_path.display(), extract_dir.display())])
-        .output()
-        .map_err(|e| msg("ov.extractRun", serde_json::json!({"e": e.to_string()})))?;
-
-    if !ps_result.status.success() {
-        let stderr = String::from_utf8_lossy(&ps_result.stderr);
-        return Err(msg("ov.extractFailed", serde_json::json!({"err": stderr.trim().to_string()})));
-    }
+    let file = File::open(&zip_path).map_err(|e| msg("ov.extractRead", serde_json::json!({"e": e.to_string()})))?;
+    let reader = BufReader::new(file);
+    zip::ZipArchive::new(reader)
+        .and_then(|mut archive| archive.extract(&extract_dir))
+        .map_err(|e| msg("ov.extractFailed", serde_json::json!({"err": e.to_string()})))?;
 
     println!("[overlay] Extraction complete");
 
