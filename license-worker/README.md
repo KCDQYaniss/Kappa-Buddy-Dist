@@ -1,8 +1,10 @@
 # license-worker — Backend de licence de Kappa Buddy
 
-> **Note** : Kappa Buddy est distribué gratuitement ; ce backend de licence n'est
-> **pas déployé et n'est pas utilisé** par l'app. Il est conservé dans le dépôt comme
-> option future (si une revente ou un gate devenait pertinent).
+> **État (30 oct. 2026)** : le modèle payant est **retenu** (vente sur itch.io,
+> licence à vie). Ce Worker est **codé, testé (58 checks) et implémenté côté
+> app** (`src-tauri/src/license.rs` + `ui/license.js`), mais **pas encore
+> déployé** : il lui faut un compte Cloudflare, une page itch.io et les étapes
+> de la checklist « Mise en vente » en bas de ce fichier.
 
 Worker Cloudflare (gratuit) + base **D1** (SQLite). Déploiement **unique**,
 aucune gestion au quotidien : l'acheteur colle sa clé itch, le Worker lie
@@ -101,6 +103,35 @@ node -e "const c=require('crypto');const k=c.generateKeyPairSync('ed25519');cons
 ```
 - `PRIVATE_PKCS8_B64` → secret Worker (signe les tokens)
 - `PUBLIC_RAW_HEX` → 32 octets compilés dans le module de licence de l'app (vérifie)
+
+> ⚠ Une paire a déjà été générée (30 oct. 2026) : la privée est dans
+> `%USERPROFILE%\.tauri\kappa-license-private.pkcs8.b64` (HORS dépôt) et la
+> publique est compilée dans `src-tauri/src/license.rs` (`PUB_KEY_RAW_HEX`).
+> NE PAS régénérer sans remplacer les deux côtés.
+
+## Checklist de mise en vente (payant)
+
+1. **itch.io** : créer la page produit (payante, prix libre) → récupérer le
+   `GAME_ID` (l'ID numérique de la page) → le mettre dans `wrangler.toml [vars]`.
+2. **Cloudflare** : `npx wrangler login`, créer D1 `kappa-license`, appliquer
+   `schema.sql`, poser les secrets (`LICENSE_PRIVATE_PKCS8_B64` depuis le
+   fichier hors dépôt, `ADMIN_PASSWORD`, optionnel `ITCH_API_KEY`), `deploy`.
+3. **Vérifier itch** : acheter la clé de test sur la page, activer une fois
+   (pattern itch revalidé à cette occasion — cf. avertissement plus haut).
+4. **Brancher l'app** (2 constantes, un commit) :
+   - `src-tauri/src/license.rs` → `WORKER_URL` = URL réelle du Worker déployé ;
+   - `ui/license.js` → `ITCH_URL` = URL de la page itch (sinon le bouton
+     d'achat reste caché).
+5. **Revalider la licence CC BY-NC-SA des cartes** : usage payant = hors
+   NonCommercial. Demander l'autorisation écrite des auteurs
+   (the-hideout/tarkov-dev-svg-maps) avant la mise en vente effective.
+6. **Distribution** : l'installateur part sur la page itch (privé pour les
+   non-acheteurs). Le canal d'update public GitHub devient inadapté à une
+   version vendue — décision updater (itch app/butler vs endpoint privé) à
+   figer au commit `1.0.0`.
+7. **Smoke test** : `/v1/health` → 200, activation réelle, désactivation
+   (oubli local), re-activation, swap sur un 2ᵉ PC virtuel, essai expiré
+   (`KB_FORCE_TRIAL_EXPIRED=1` en debug) → gate affiché.
 
 ## Admin
 

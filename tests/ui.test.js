@@ -56,7 +56,7 @@ w.__TAURI__ = {
 w.localStorage.setItem("manualMap", "customs"); // ancien choix mémorisé : ne doit plus bloquer l'automatique
 const errors = [];
 w.addEventListener("error", (e) => errors.push(e.message));
-for (const f of ["i18n.js", "theme.js", "vendor/leaflet.js", "geo.js", "tactical.js", "store.js", "mapview.js", "quests.js", "items.js", "hideout.js", "catchup.js", "tour.js", "app.js"]) w.eval(fs.readFileSync(root + f, "utf8"));
+for (const f of ["i18n.js", "theme.js", "vendor/leaflet.js", "geo.js", "tactical.js", "store.js", "license.js", "mapview.js", "quests.js", "items.js", "hideout.js", "catchup.js", "tour.js", "app.js"]) w.eval(fs.readFileSync(root + f, "utf8"));
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 let failed = 0;
@@ -580,6 +580,24 @@ const emit = (n, payload) => handlers[n]({ payload });
   TT.store.S.idx.tasks[ocrId].normalizedName = prevNN;
   d.getElementById("cu-ocr-cancel").click();
   d.getElementById("cu-close").click();
+
+  /* ---------- Licence (gate d'activation) ---------- */
+  ok(!!TT.license, "module de licence chargé");
+  const errTxt = TT.license.errText({ error_code: "license.err.invalidKey" });
+  ok(errTxt && errTxt !== "license.err.invalidKey", "les codes d'erreur de licence sont traduits");
+  ok(TT.license.errText({ error_code: "license.err.zzzInconnu" }) === TT.i18n.t("license.err.server"), "code de licence inconnu → message générique");
+  const gate = d.getElementById("gate");
+  ok(!!gate && gate.hidden, "gate présent et caché hors Tauri (mode démo)");
+  TT.license._setState({ status: "expired", trial_days_total: 3 }, { error_code: "license.err.alreadyBound", error_params: { d: 30 }, can_swap: true });
+  ok(!gate.hidden, "gate affiché quand l'essai est expiré");
+  ok(gate.querySelector("#gate-title").textContent === TT.i18n.t("license.gateTitle"), "titre du gate traduit");
+  ok(!!gate.querySelector("#gate-key") && !!gate.querySelector("#gate-activate"), "champ de clé + bouton activer présents");
+  ok(!!gate.querySelector("#gate-swap"), "bouton « libérer mon ancien PC » présent sur already_bound/can_swap");
+  ok(gate.querySelector(".gate-err").textContent !== "", "message d'erreur affiché dans le gate");
+  TT.license._setState({ status: "licensed", trial_days_total: 3 }, null);
+  ok(gate.hidden, "gate masqué sur licence active");
+  TT.license._setState({ status: "expired", trial_days_total: 3 }, { error_code: "license.err.invalidKey" });
+  ok(!gate.querySelector("#gate-swap"), "pas de bouton swap sans can_swap");
 
   ok(errors.length === 0, "aucune erreur JavaScript" + (errors.length ? " : " + errors.join(" | ") : ""));
   console.log(failed ? `\n${failed} échec(s)` : "\nTout est bon");

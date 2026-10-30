@@ -273,6 +273,7 @@ body {
     "o.autoOn": ["Mode auto : activé", "Auto mode: on", "Авто-режим: вкл"],
     "o.autoOff": ["Mode auto : désactivé", "Auto mode: off", "Авто-режим: выкл"],
     "o.startTarkov": ["Lance Tarkov d'abord", "Start Tarkov first", "Сначала запустите Tarkov"],
+    "license.expired": ["Essai terminé — active ta licence dans Kappa Buddy", "Trial over — activate your license in Kappa Buddy", "Пробный период завершён — активируйте лицензию в Kappa Buddy"],
     /* Messages codés du backend (status « error ») : rtO les résout, un code
        inconnu retombe sur le générique traduit « o.readError ». */
     "ov.clientHttp": ["Client HTTP : {e}", "HTTP client: {e}", "HTTP-клиент: {e}"],
@@ -637,6 +638,10 @@ body {
         showError(rtO(data.message), data.autohide);
       } else if (status === "not-in-game") {
         showError(t("o.startTarkov"), data.autohide || 4);
+      } else if (status === "license") {
+        // Gate licence : reste affiché, la capture est refusée tant que
+        // l'essai est expiré (cf. license.rs gate()).
+        showError(t("license.expired"), 0);
       }
     } catch (e) {}
   }

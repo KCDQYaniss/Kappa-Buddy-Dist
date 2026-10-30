@@ -626,6 +626,8 @@
       TT.logsOk = !!state.logs_dir; TT.mapview.updateChip(); TT.quests.render();
       if (state.map) TT.mapview.onMap(state.map);
       if (state.position) TT.mapview.onPosition(state.position);
+      // Licence : affiche le voile d'activation si l'essai est expiré.
+      TT.license.init();
     } else {
       TT.warn(t("misc.demoMode"));
       applyModeUi(TT.store.S.mode);
