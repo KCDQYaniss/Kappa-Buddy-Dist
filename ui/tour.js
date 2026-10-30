@@ -7,6 +7,7 @@
   const t = (k, p) => TT.i18n.t(k, p);
 
   const STEPS = [
+    { sel: "#license-badge", text: "tour.license", place: "bottom" },
     { sel: "#map-select", text: "tour.mapSelect", place: "bottom" },
     { sel: "#floor-bar", text: "tour.floor", place: "bottom" },
     { sel: "#center-btn", text: "tour.center", place: "bottom" },
@@ -18,6 +19,7 @@
     { sel: "#ontop-btn", text: "tour.ontop", place: "top" },
     { sel: "#mode-badge", text: "tour.mode", place: "top" },
     { sel: "#settings-btn", text: "tour.settings", place: "top" },
+    { sel: "#overlay-toggle", text: "tour.overlay", place: "top" },
   ];
   const KEY = "tourDone";
 

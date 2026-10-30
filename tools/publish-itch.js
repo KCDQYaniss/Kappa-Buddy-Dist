@@ -3,7 +3,7 @@
 //
 //   npm run publish-itch
 //
-// Butler pousse dans le canal "windows" du projet itch kappa-buddy/kappa-buddy,
+// Butler pousse dans le canal "windows" du projet itch yelt/kappa-buddy,
 // le manifeste latest.json est hébergé comme asset téléchargeable.
 //
 // Prérequis :
@@ -25,8 +25,8 @@ const tag = `v${version}`;
 
 // Butler channel cible (κappa-buddy/kappa-buddy/windows par défaut).
 // Override possible via itch.json ou env : BUTLER_CHANNEL.
-const channel = process.env.BUTLER_CHANNEL || "kappa-buddy/kappa-buddy/windows";
-const channelParts = (channel.includes("/") && channel.split("/").length >= 3) ? channel : `kappa-buddy/kappa-buddy/windows`;
+const channel = process.env.BUTLER_CHANNEL || "yelt/kappa-buddy/windows";
+const channelParts = (channel.includes("/") && channel.split("/").length >= 3) ? channel : `yelt/kappa-buddy/windows`;
 
 console.log(`\nPub Butcher ${version} → itch:${channelParts}\n`);
 
@@ -53,7 +53,7 @@ const setupPath = path.join(bundle, setupName);
 
 // 2) Butler pousse l'installateur + manifeste latest.json + zip portable.
 //    Le manifeste doit être publié sous le nom "latest.json" pour que l'URL
-//    fixe https://kappa-buddy.itch.io/kappa-buddy/download/kappa-buddy/latest.json
+//    fixe https://yelt.itch.io/kappa-buddy/download/kappa-buddy/latest.json
 //    serve toujours la dernière version.
 console.log("Envoi via Butler :");
 console.log(`  • ${setupName}`);
@@ -78,5 +78,5 @@ if (fs.existsSync(portable)) {
 butler("push", setupPath, channelParts);
 butler("push", latestJson, channelParts.replace(/\/windows$/, "") + "/latest.json");
 
-console.log(`\n✅ Publié sur itch : https://kappa-buddy.itch.io/kappa-buddy`);
-console.log(`    latest.json → https://kappa-buddy.itch.io/kappa-buddy/download/kappa-buddy/latest.json\n`);
+console.log(`\n✅ Publié sur itch : https://yelt.itch.io/kappa-buddy`);
+console.log(`    latest.json → https://yelt.itch.io/kappa-buddy/download/kappa-buddy/latest.json\n`);

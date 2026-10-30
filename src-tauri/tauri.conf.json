@@ -58,7 +58,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://kappa-buddy.itch.io/kappa-buddy/download/kappa-buddy/latest.json"
+        "https://yelt.itch.io/kappa-buddy/download/kappa-buddy/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDkzODZDRjUwQkJGMzk5MDEKUldRQm1mTzdVTStHazRXamFyOUt1Rk4rQVAybUNWVTNmQ283UUd1aFBZOVR2eTZaMTJWU3NmNjkK"
     }

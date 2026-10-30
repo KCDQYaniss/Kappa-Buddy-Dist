@@ -46,9 +46,11 @@ function main() {
   // Déploiement Itch : les updates sont hébergés sur itch.io via Butler.
   // Le manifeste latest.json est signé localement (minisign), l'URL indique juste
   // où le télécharger.
-  const endpoint = cfg.itchChannel
-    ? `https://${cfg.itchChannel}.itch.io/kappa-buddy/download/kappa-buddy/latest.json`
-    : `https://github.com/${cfg.repo}/releases/latest/download/latest.json`;
+  const endpoint = cfg.itchOwner && cfg.itchChannel
+    ? `https://${cfg.itchOwner}.itch.io/${cfg.itchChannel}/download/${cfg.itchChannel}/latest.json`
+    : cfg.itchChannel
+      ? `https://${cfg.itchChannel}.itch.io/kappa-buddy/download/kappa-buddy/latest.json`
+      : `https://github.com/${cfg.repo}/releases/latest/download/latest.json`;
 
   const conf = readJson(CONF);
   conf.plugins = conf.plugins || {};
