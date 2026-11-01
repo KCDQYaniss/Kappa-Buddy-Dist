@@ -1,5 +1,19 @@
 # Changelog / Journal des modifications
 
+## 1.0.1 — Détection des étages réparée (hauteur + zone au sol)
+
+### FR
+- **La détection automatique d'étage fonctionne de nouveau** : l'app compare désormais la hauteur du joueur **et** sa position au sol avec les zones de chaque étage (données `extents` de tarkov.dev, comme le site de référence). Avant, les plages de hauteur de bâtiments différents étaient fusionnées : sur Customs, dès y ≥ 5,7 m l'app affichait le 3e étage où que tu sois ; sur Réserve, le sol était pris pour le 4e étage ; sur Ground Zero, l'extérieur pour le Garage.
+- Concrètement : en plein air, même à une hauteur « d'étage », la carte reste au rez-de-chaussée ; dans les dortoirs de Customs, y=4 affiche le 2e étage et y=10 le 3e ; les sous-sols ne s'affichent que dans leurs zones (bunkers, garages, tunnels).
+- Le fond « vue tactique » filtre ses points avec la même règle (plus de points d'un autre bâtiment dessinés sur l'étage courant).
+- Données de cartes régénérées avec les zones par étage (42 étages concernés : Customs, Réserve, Ground Zero, Interchange, Labs, Streets, Shoreline, Factory, Icebreaker).
+
+### EN
+- **Automatic floor detection is fixed**: the app now matches the player's height **and** ground position against each floor's areas (tarkov.dev `extents` data, same as the reference site). Previously, height ranges of different buildings were merged: on Customs, any y ≥ 5.7 m showed the 3rd floor wherever you were; on Reserve, ground level read as the 4th floor; on Ground Zero, outdoors read as the Garage.
+- In practice: outdoors, even at a “floor” height, the map stays on ground level; in the Customs dorms, y=4 shows the 2nd floor and y=10 the 3rd; basements only show inside their own areas (bunkers, garages, tunnels).
+- The “tactical view” background filters its points with the same rule (no more points from another building drawn on the current floor).
+- Map data regenerated with per-floor areas (42 floors affected: Customs, Reserve, Ground Zero, Interchange, Labs, Streets, Shoreline, Factory, Icebreaker).
+
 ## 1.0.0 — Kappa Buddy : première version stable, gratuite et entièrement traduite
 
 ### FR

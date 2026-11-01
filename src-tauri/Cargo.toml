@@ -1,6 +1,6 @@
 [package]
 name = "tarkov-tracker"
-version = "1.0.0"
+version = "1.0.1"
 description = "Kappa Buddy - companion for Escape from Tarkov: quests, maps, live position, price overlay"
 edition = "2021"
 
