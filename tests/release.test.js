@@ -13,8 +13,8 @@ ok(normalizeAssetName("Tarkov Tracker_0.7.2_x64-setup.exe") === "Tarkov.Tracker_
 ok(normalizeAssetName("Kappa Buddy_1.0.0_x64-setup.exe") === "Kappa.Buddy_1.0.0_x64-setup.exe", "rebrand : « Kappa Buddy » se normalise pareil");
 ok(normalizeAssetName("sans_espace.exe") === "sans_espace.exe", "un nom sans espace est inchangé");
 ok(assetPathSegment("Tarkov Tracker_0.7.2_x64-setup.exe") === "Tarkov.Tracker_0.7.2_x64-setup.exe", "segment d'URL normalisé");
-const url = assetUrl("KCDQYaniss/Tarkov-Tracker", "v0.7.2", "Tarkov Tracker_0.7.2_x64-setup.exe");
-ok(url === "https://github.com/KCDQYaniss/Tarkov-Tracker/releases/download/v0.7.2/Tarkov.Tracker_0.7.2_x64-setup.exe", "URL sans %20 (le bug 404 ne peut pas revenir)");
+const url = assetUrl("KCDQYaniss/Kappa-Buddy-Dist", "v0.7.2", "Tarkov Tracker_0.7.2_x64-setup.exe");
+ok(url === "https://github.com/KCDQYaniss/Kappa-Buddy-Dist/releases/download/v0.7.2/Tarkov.Tracker_0.7.2_x64-setup.exe", "URL sans %20 (le bug 404 ne peut pas revenir)");
 ok(!url.includes("%20"), "aucun espace encodé dans l'URL");
 
 console.log("Notes de version extraites du CHANGELOG");

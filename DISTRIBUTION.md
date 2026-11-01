@@ -42,10 +42,10 @@ L'app vérifie les mises à jour **au démarrage** et propose à l'utilisateur d
 
 ### Mise en place (une seule fois)
 
-1. Crée un dépôt GitHub (public ou privé) et dépose-y le code.
-2. Renseigne-le dans `tools/release.config.json` :
+1. Le dépôt `KCDQYaniss/Kappa-Buddy-Dist` (public) héberge le code source **et** les releases.
+2. Il est déjà renseigné dans `tools/release.config.json` :
    ```json
-   { "repo": "TON-COMPTE/Kappa-Buddy-Dist", "legacyRepo": "TON-COMPTE/Tarkov-Tracker", "notes": "" }
+   { "repo": "KCDQYaniss/Kappa-Buddy-Dist", "notes": "" }
    ```
 3. La clé de signature des mises à jour a déjà été générée dans `%USERPROFILE%\.tauri\tarkov-tracker.key`.
    **Sauvegarde-la et garde-la secrète.** Si tu la perds, les installations existantes ne pourront plus se mettre à jour
