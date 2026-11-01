@@ -36,7 +36,7 @@ async function boot({ logsDir = "C:/L", report = { events: [], files: 2, session
   };
   const errors = [];
   w.addEventListener("error", (e) => errors.push(e.message));
-  for (const f of ["i18n.js", "theme.js", "vendor/leaflet.js", "geo.js", "tactical.js", "store.js", "mapview.js", "quests.js", "items.js", "catchup.js", "tour.js", "app.js"]) w.eval(fs.readFileSync(root + f, "utf8"));
+  for (const f of ["i18n.js", "theme.js", "vendor/leaflet.js", "geo.js", "store.js", "mapview.js", "quests.js", "items.js", "catchup.js", "tour.js", "app.js"]) w.eval(fs.readFileSync(root + f, "utf8"));
   await wait(350);
   const st = w.TT.store;
   return { w, d: w.document, TT: w.TT, st, handlers, calls, env, errors, state: (id) => st.stateOf(st.S.idx.tasks[id]) };

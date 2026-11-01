@@ -27,8 +27,6 @@
     /* ---------- Carte : barre ---------- */
     "map.center": ["Centrer sur moi", "Center on me", "Auf mich zentrieren", "Centrar en mí", "Центрировать на мне"],
     "map.bright": ["Carte éclaircie", "Brighten map", "Karte aufhellen", "Aclarar mapa", "Осветлить карту"],
-    "map.tactical": ["Vue tactique", "Tactical view", "Taktische Ansicht", "Vista táctica", "Тактический вид"],
-    "map.tactical.tip": ["Fond de carte généré depuis les données du jeu (grille, densité de loot, zones) — sans image communauté.", "Map background generated from game data (grid, loot density, zones) — no community artwork.", "Kartenhintergrund aus Spieldaten erzeugt (Raster, Beute-Dichte, Zonen) — ohne Community-Grafiken.", "Fondo del mapa generado a partir de los datos del juego (rejilla, densidad de botín, zonas) — sin imágenes de la comunidad.", "Фон карты создаётся из данных игры (сетка, плотность лута, зоны) — без карт сообщества."],
     "map.bright.tip": ["Éclaircit l'image de carte (les cartes sont sombres)", "Brightens the map image (maps are dark)", "Hellt das Kartenbild auf (Karten sind dunkel)", "Aclara la imagen del mapa (los mapas son oscuros)", "Осветляет изображение карты (карты тёмные)"],
     "map.floor.auto": ["Suivre ta hauteur en jeu", "Follow your in-game height", "Deine Höhe im Spiel folgen", "Seguir tu altura en el juego", "Следить за высотой в игре"],
     "map.floor.autoShort": ["Auto", "Auto", "Auto", "Auto", "Авто"],
