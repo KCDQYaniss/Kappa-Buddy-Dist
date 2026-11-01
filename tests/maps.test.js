@@ -33,6 +33,12 @@ for (const m of maps) {
       ok(distinct.size === 1, `${m.slug} étage ${i + 1} : un seul niveau dessiné (${[...distinct].join(", ") || "aucun"})`);
     }
     if (f.ylim) ok(Array.isArray(f.ylim) && f.ylim.length === 2 && f.ylim[0] <= f.ylim[1], `${m.slug} étage ${i + 1} : plage de hauteur cohérente`);
+    if (f.extents) {
+      ok(Array.isArray(f.extents) && f.extents.length > 0, `${m.slug} étage ${i + 1} : extents présents`);
+      ok(f.extents.every((e) => Array.isArray(e.h) && e.h.length === 2 && e.h[0] <= e.h[1] &&
+        (!e.b || (Array.isArray(e.b) && e.b.every((r) => r.length === 4 && r.every(Number.isFinite))))),
+        `${m.slug} étage ${i + 1} : extents cohérents (hauteur + rectangles x/z)`);
+    }
   });
 }
 

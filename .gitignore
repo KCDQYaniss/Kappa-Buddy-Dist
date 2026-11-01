@@ -2,6 +2,7 @@ target/
 node_modules/
 src-tauri/gen/
 dist/
+__pycache__/
 
 tests/_chain.txt
 

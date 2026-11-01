@@ -100,7 +100,7 @@
    * Génère le fond tactique d'un étage.
    * @param def      définition carte (ui/maps.json) : transform, rotation, bounds, floors
    * @param md       données de la carte (idx.maps[slug]) : containers, loose, spawns, hazards, bosses
-   * @param floorIdx 0 = tout (vue sol), sinon filtré par floors[i].ylim
+   * @param floorIdx 0 = tout (vue sol), sinon filtré par floors[i] (extents/ylim)
    * @param theme    "dark" | "light" | "cyberpunk"
    * @param lang     langue des libellés (défaut fr)
    * @returns string SVG (viewBox dans l'espace pixel de la calibration), ou "" si impossible
@@ -123,15 +123,32 @@
     }
   }
 
-  function ylimOf(def, floorIdx) {
-    const fl = (def.floors || [])[floorIdx];
-    return fl && fl.ylim ? fl.ylim : null;   // [min, max) — null = tout
+  /** Le point (x, z) est-il dans une des zones au sol de l'étendue ? Même
+   *  convention que mapview.inExtent : rectangles [x1, z1, x2, z2], absence de
+   *  zone (ou de position fiable) = la hauteur seule suffit. */
+  function inExtent(e, x, z) {
+    if (!e.b || !isFinite(x) || !isFinite(z)) return true;
+    for (const r of e.b) {
+      if (x >= Math.min(r[0], r[2]) && x <= Math.max(r[0], r[2]) &&
+          z >= Math.min(r[1], r[3]) && z <= Math.max(r[1], r[3])) return true;
+    }
+    return false;
   }
 
-  function inFloor(p, ylim) {
-    if (!ylim) return true;
+  /** Le point p appartient-il à l'étage ? Comme mapview.pickFloor : extents
+   *  fines (hauteur + zone au sol) quand l'étage en a, sinon ylim globale ;
+   *  étage inconnu (null) = tout dessiner. */
+  function inFloor(p, floor) {
+    if (!floor) return true;
     const y = Number(p.y) || 0;
-    return y >= ylim[0] && y < ylim[1];
+    if (floor.extents && floor.extents.length) {
+      for (const e of floor.extents) {
+        if (y >= e.h[0] && y <= e.h[1] && inExtent(e, p.x, p.z)) return true;
+      }
+      return false;
+    }
+    const ylim = floor.ylim;
+    return !ylim || (y >= ylim[0] && y < ylim[1]);
   }
 
   function render(def, md, floorIdx, P, cal, lang) {
@@ -146,7 +163,7 @@
     const vw = Math.max(...xs) - vx, vh = Math.max(...ys) - vy;
     if (!(vw > 0 && vh > 0)) return "";
     const rot = cal.rotation || 0;
-    const ylim = ylimOf(def, floorIdx);
+    const floor = (def.floors || [])[floorIdx] || null;
     const s = [];
 
     s.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${n1(vx)} ${n1(vy)} ${n1(vw)} ${n1(vh)}" width="${Math.round(vw)}" height="${Math.round(vh)}" preserveAspectRatio="none">`);
@@ -169,9 +186,9 @@
       const q = cal.gamePixel(p.x, p.z);
       s.push(`<circle cx="${n1(q.x)}" cy="${n1(q.y)}" r="${r}" fill="${fill}" fill-opacity="${op}"/>`);
     };
-    for (const c of md.containers || []) if (inFloor(c.position, ylim)) dot(c.position, dotR(vw, 1.7), P.container, 0.3);
-    for (const c of md.loose || []) if (inFloor(c.position, ylim)) dot(c.position, dotR(vw, 1.4), P.loose, 0.32);
-    for (const sp of md.spawns || []) if (inFloor(sp.position, ylim)) dot(sp.position, dotR(vw, 1.1), P.spawn, 0.4);
+    for (const c of md.containers || []) if (inFloor(c.position, floor)) dot(c.position, dotR(vw, 1.7), P.container, 0.3);
+    for (const c of md.loose || []) if (inFloor(c.position, floor)) dot(c.position, dotR(vw, 1.4), P.loose, 0.32);
+    for (const sp of md.spawns || []) if (inFloor(sp.position, floor)) dot(sp.position, dotR(vw, 1.1), P.spawn, 0.4);
 
     // ---- Dangers (polygones fournis par la donnée : champs de mines…) ----
     for (const h of md.hazards || []) {
@@ -184,7 +201,7 @@
     // ---- Étiquettes de zones : noms venant des apparitions, répartis sans chevaucher ----
     const byZone = {};
     for (const sp of md.spawns || []) {
-      if (!inFloor(sp.position, ylim) || !sp.zoneName) continue;
+      if (!inFloor(sp.position, floor) || !sp.zoneName) continue;
       (byZone[sp.zoneName] = byZone[sp.zoneName] || []).push(sp.position);
     }
     const fs = fontSize(vw, vh);
@@ -212,7 +229,7 @@
     for (const bo of md.bosses || []) {
       for (const loc of (bo.spawnLocations || [])) {
         const p = (loc.positions || [])[0];
-        if (!p || !inFloor(p, ylim)) continue;
+        if (!p || !inFloor(p, floor)) continue;
         const q = cal.gamePixel(p.x, p.z);
         s.push(`<text x="${n1(q.x)}" y="${n1(q.y)}" fill="${P.boss}" font-size="${bfs}" font-style="italic" text-anchor="middle" transform="rotate(${n1(-rot)} ${n1(q.x)} ${n1(q.y)})">${esc(bo.name || "")}</text>`);
       }

@@ -160,11 +160,19 @@ const emit = (n, payload) => handlers[n]({ payload });
   ok(d.querySelector('#floor-bar [data-floor="2"]').classList.contains("on"), "étage courant mis en évidence");
   d.querySelector("#floor-bar [data-floor-auto]").click();
   ok(TT.mapview.current().floorAuto, "retour en sélection automatique");
-  emit("position", { x: 50, y: 30, z: 0, fx: 0, fz: 1, yaw_deg: 0, file: "t.png" });
-  ok(TT.mapview.current().floorIndex === 3, "étage suivi automatiquement d'après la hauteur du joueur (y=30 → 4e)");
+  // Positions réelles de Customs (rectangles « extents » de maps.json) :
+  // la hauteur seule ne suffit plus, il faut être DANS la zone de l'étage.
+  emit("position", { x: 262, y: 30, z: -40, fx: 0, fz: 1, yaw_deg: 0, file: "t.png" });   // zone « oilrig & panda »
+  ok(TT.mapview.current().floorIndex === 3, "étage suivi automatiquement : hauteur + zone (y=30 dans la zone du 4e → 4e)");
   ok(TT.mapview.current().baseLayer.options.opacity < 1, "la base reste en transparence quand l'étage change tout seul");
-  emit("position", { x: 50, y: -100, z: 0, fx: 0, fz: 1, yaw_deg: 0, file: "t.png" });
-  ok(TT.mapview.current().floorIndex === 4, "sous-sol détecté quand on descend (y=-100)");
+  emit("position", { x: 204, y: 4, z: 157, fx: 0, fz: 1, yaw_deg: 0, file: "t.png" });   // dortoirs
+  ok(TT.mapview.current().floorIndex === 1, "2e étage des dortoirs (y=4 dans la zone) — la zone tranche entre étages superposés");
+  emit("position", { x: 204, y: 10, z: 157, fx: 0, fz: 1, yaw_deg: 0, file: "t.png" });
+  ok(TT.mapview.current().floorIndex === 2, "3e étage des dortoirs (y=10 dans la zone)");
+  emit("position", { x: 50, y: 3, z: 0, fx: 0, fz: 1, yaw_deg: 0, file: "t.png" });   // en plein air, hauteur égale à un 2e étage ailleurs
+  ok(TT.mapview.current().floorIndex === 0, "en plein air : rez-de-chaussée même à y=3 (plus de faux 2e étage)");
+  emit("position", { x: 336, y: -100, z: -60, fx: 0, fz: 1, yaw_deg: 0, file: "t.png" });   // zone « switch basement »
+  ok(TT.mapview.current().floorIndex === 4, "sous-sol détecté quand on descend (zone souterraine)");
   ok(!TT.mapDefs.find((m) => m.slug === "woods").floors, "Woods n'a qu'un niveau (pas de sélecteur)");
   ok(!!TT.mapDefs.find((m) => m.slug === "customs").floors, "Customs déclare ses étages dans maps.json");
 

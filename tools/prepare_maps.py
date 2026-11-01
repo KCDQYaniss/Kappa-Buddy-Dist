@@ -7,7 +7,8 @@
 
 Les cartes à plusieurs niveaux (Interchange, Customs, Factory, Réserve, Streets, Labs, Icebreaker…)
 reçoivent un visuel par étage : l'app bascule d'un niveau à l'autre, automatiquement selon la
-hauteur du joueur quand les données de hauteur sont connues (extraits des `extents`).
+position du joueur — plage de hauteur ET rectangle au sol de chaque étage (`extents` de
+tarkov.dev), comme le fait tarkov.dev lui-même.
 
 Usage : python3 tools/prepare_maps.py
 """
@@ -85,6 +86,40 @@ def layer_ylim(layer) -> list:
     return [min(h[0] for h in hs), max(h[1] for h in hs)]
 
 
+def layer_extents(layer) -> list:
+    """Étendues fines d'un étage, telles que décrites par tarkov.dev.
+
+    Chaque `extent` est une plage de hauteur `h` et, souvent, les rectangles au
+    sol `b` ([x1, z1, x2, z2]) où elle s'applique. C'est le couple hauteur + zone
+    qui permet de savoir sur quel étage est le joueur : deux bâtiments voisins
+    n'ont pas les mêmes hauteurs de plancher, l'union des hauteurs seule (ylim)
+    produit des plages qui se chevauchent et un étage deviné au hasard.
+    """
+    out = []
+    for e in (layer.get("extents") or []):
+        h = e.get("height")
+        if not h or len(h) != 2:
+            continue
+        ext = {"h": [h[0], h[1]]}
+        bs = []
+        for b in (e.get("bounds") or []):
+            if len(b) >= 2 and all(isinstance(v, (int, float)) for p in b[:2] for v in p):
+                bs.append([b[0][0], b[0][1], b[1][0], b[1][1]])
+        if bs:
+            ext["b"] = bs
+        out.append(ext)
+    return out
+
+
+def add_height(f, layer) -> None:
+    """Attache à un étage sa plage `ylim` (repli grossier) et ses `extents` fines."""
+    ext = layer_extents(layer)
+    if ext:
+        f["extents"] = ext
+    if layer_ylim(layer):
+        f["ylim"] = layer_ylim(layer)
+
+
 def base_floor_name(m: dict, layers: list) -> str:
     sl = m.get("svgLayer")
     if sl in FLOOR_NAMES:
@@ -138,16 +173,14 @@ def main():
                         # Étages seulement disponibles en tuiles (ex. Réserve 2e-5e).
                         if l.get("tilePath"):
                             f = {"name": l["name"], "tiles": l["tilePath"], "tileSize": l.get("tileSize") or 256}
-                            if layer_ylim(l):
-                                f["ylim"] = layer_ylim(l)
+                            add_height(f, l)
                             floor_list.append(f)
                         continue
                     sub = keep_only(svg, l["svgLayer"])
                     fname_out = f"{slug}-f{i + 1}.svg"
                     (OUT / "maps" / fname_out).write_text(sub, encoding="utf-8")
                     f = {"name": l["name"], "image": f"maps/{fname_out}"}
-                    if layer_ylim(l):
-                        f["ylim"] = layer_ylim(l)
+                    add_height(f, l)
                     floor_list.append(f)
                 report.append(f"{slug}: svg ok ({len(base_svg) // 1024} Ko) + {len(floor_list) - 1} étage(s)")
             except Exception as e:
@@ -165,8 +198,7 @@ def main():
                 if not l.get("tilePath"):
                     continue
                 f = {"name": l["name"], "tiles": l["tilePath"], "tileSize": l.get("tileSize") or entry["tileSize"]}
-                if layer_ylim(l):
-                    f["ylim"] = layer_ylim(l)
+                add_height(f, l)
                 floor_list.append(f)
             report.append(f"{slug}: tuiles distantes ({len(floor_list)} étage(s))")
         else:

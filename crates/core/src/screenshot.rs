@@ -18,8 +18,10 @@ pub struct Position {
 
 /// Parse un nom de screenshot Tarkov.
 ///
-/// Forme attendue (à confirmer sur une vraie capture, voir README) :
-/// `2024-01-15[21-04]_x, y, z_qx, qy, qz, qw_vitesse (0).png`
+/// Format confirmé (identique à celui que parse TarkovMonitor) :
+/// `2024-01-15[21-04]_-141.45, 23.33, 57.23_0.0, 0.70711, 0.0, 0.70711_8.4 (0).png`
+/// soit date[heure]_x, y (hauteur), z_qx, qy, qz, qw_vitesse (n).png, avec un
+/// `_` optionnel entre z et le quaternion.
 ///
 /// Le parseur est volontairement tolérant : il ignore la date, découpe le reste
 /// sur `_` et `,`, puis lit les 7 premiers nombres (x y z qx qy qz qw).
@@ -81,8 +83,8 @@ pub fn parse_screenshot_name(name: &str) -> Option<Position> {
 mod tests {
     use super::*;
 
-    // Noms synthétiques construits d'après le format décrit ; à remplacer par
-    // de vrais noms de fichiers dès qu'on en a un sous la main.
+    // Noms synthétiques au format confirmé de TarkovMonitor (même grammaire que
+    // son parseur C#) : date[heure]_x, y, z_qx, qy, qz, qw_vitesse (n).png.
     #[test]
     fn parse_nom_complet() {
         let p = parse_screenshot_name(
