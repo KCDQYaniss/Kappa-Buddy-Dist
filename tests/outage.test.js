@@ -26,7 +26,7 @@ w.__TAURI__ = {
 };
 const errors = [];
 w.addEventListener("error", (e) => errors.push(e.message));
-for (const f of ["i18n.js", "theme.js", "vendor/leaflet.js", "geo.js", "tactical.js", "store.js", "license.js", "mapview.js", "quests.js", "items.js", "catchup.js", "tour.js", "app.js"]) w.eval(fs.readFileSync(root + f, "utf8"));
+for (const f of ["i18n.js", "theme.js", "vendor/leaflet.js", "geo.js", "tactical.js", "store.js", "mapview.js", "quests.js", "items.js", "catchup.js", "tour.js", "app.js"]) w.eval(fs.readFileSync(root + f, "utf8"));
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 let failed = 0;

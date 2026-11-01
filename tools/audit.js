@@ -23,7 +23,6 @@ const PATTERNS = [
   ["chemin utilisateur Unix", /\/(home|Users)\/[a-z0-9._-]+\//gi, "chemin absolu vers un profil utilisateur"],
   ["clé d'API", /\b(api[_-]?key|apikey|access[_-]?token|secret[_-]?key)\b\s*[:=]\s*["'][^"']{8,}/gi, "secret en clair"],
   ["clé privée", /-----BEGIN [A-Z ]*PRIVATE KEY-----/g, "clé privée"],
-  ["secret du Worker de licence", /\b(ADMIN_PASSWORD|ITCH_API_KEY|LICENSE_PRIVATE_PKCS8_B64|PRIVATE_PKCS8_B64|PUBLIC_RAW_HEX)\b\s*[:=]\s*["'][A-Za-z0-9+/_=-]{32,}["']/g, "secret du backend de licence en clair"],
   ["mot de passe", /\b(password|passwd|mot[_-]?de[_-]?passe)\b\s*[:=]\s*["'][^"']{4,}/gi, "identifiant en clair"],
   ["jeton Bearer", /Bearer\s+[A-Za-z0-9._-]{20,}/g, "jeton d'authentification"],
   ["jeton GitHub", /\bgh[pousr]_[A-Za-z0-9]{30,}\b/g, "jeton GitHub"],

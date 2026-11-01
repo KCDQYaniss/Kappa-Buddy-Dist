@@ -1,7 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod data;
-mod license;
 mod ocr;
 mod overlay;
 mod priority;
@@ -399,19 +398,6 @@ fn store_overlay(payload: serde_json::Value) {
 /// ~1s. Les réglages d'affichage (cfg) et les corrections OCR suivent chaque
 /// capture : la carte brieffée reste alignée sur les réglages courants.
 async fn run_overlay_capture(app: &AppHandle) {
-    // Gate licence : essai ou licence requise pour tout ce qui touche au jeu.
-    if let Err(e) = license::gate(app) {
-        println!("[license] capture refusée : essai expiré");
-        let _ = overlay::hide_overlay_window(app);
-        let _ = overlay::show_overlay_window(app);
-        store_overlay(serde_json::json!({
-            "status": "license",
-            "autohide": 0,
-            "code": e,
-            "cfg": build_overlay_cfg(&app.state::<AppState>().settings.lock().unwrap().clone()),
-        }));
-        return;
-    }
     let (lang, mode, autohide, cfg, corrections) = {
         let st = app.state::<AppState>();
         let s = st.settings.lock().unwrap();
@@ -974,10 +960,6 @@ fn set_game_mode(app: AppHandle, state: State<AppState>, mode: String) -> Result
 /// « s-cursor-overlay » des réglages.
 #[tauri::command]
 async fn toggle_overlay(app: AppHandle, enabled: bool) -> Result<(), String> {
-    // Gate licence : l'overlay carte-jeu est une fonctionnalité payante.
-    if enabled {
-        license::gate(&app)?;
-    }
     overlay::toggle_overlay(&app, enabled).await
 }
 
@@ -989,38 +971,7 @@ fn capture_overlay(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/* ---------- Licence ---------- */
-
-/// État courant : "licensed" | "trial" | "expired" (+ jours d'essai restants).
-#[tauri::command]
-fn license_state(app: AppHandle) -> license::LicenseState {
-    license::state(&app)
-}
-
-/// Active cette machine avec une clé itch (le Worker vérifie l'achat).
-/// Les refus viennent en `status:"error"` + code traduit, pas en exception.
-#[tauri::command]
-async fn license_activate(app: AppHandle, key: String, label: Option<String>) -> license::LicenseState {
-    let bg = app.clone();
-    tauri::async_runtime::spawn_blocking(move || license::activate(&bg, &key, label))
-        .await
-        .unwrap_or_else(|_| license::state(&app))
-}
-
-/// Libère l'ancien appareil et lie celui-ci (self-service, 1×/30 j).
-#[tauri::command]
-async fn license_swap(app: AppHandle, label: Option<String>) -> license::LicenseState {
-    let bg = app.clone();
-    tauri::async_runtime::spawn_blocking(move || license::swap(&bg, label))
-        .await
-        .unwrap_or_else(|_| license::state(&app))
-}
-
-/// Oubli local (dépannage/support) : efface clé+token de cette machine.
-#[tauri::command]
-fn license_forget(app: AppHandle) -> license::LicenseState {
-    license::forget(&app)
-}
+/* ---------- Overlay : taille & rafraîchissement ---------- */
 
 /// Ajuste la fenêtre overlay à la taille exacte de la carte (appelée par le
 /// frontend après chaque rendu). La fenêtre ne déborde donc jamais de la carte,
@@ -1221,9 +1172,6 @@ fn main() {
         .setup(|app| {
             let handle = app.handle().clone();
 
-            // Licence : fixe le début de l'essai au premier lancement (no-op ensuite).
-            license::init_first_run(&handle);
-
             // Migration de l'entrée d'autostart (rebrand 1.0.0) : no-op si
             // rien à migrer.
             migrate_legacy_auto_start();
@@ -1353,10 +1301,6 @@ fn main() {
             read_screen_text,
             toggle_overlay,
             capture_overlay,
-            license_state,
-            license_activate,
-            license_swap,
-            license_forget,
             set_overlay_size,
             hide_overlay,
             is_tarkov_running_cmd,

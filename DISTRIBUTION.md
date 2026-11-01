@@ -116,21 +116,14 @@ L'archive contient l'exécutable, un `LISEZ-MOI.txt`, `README.md`, `CHANGELOG.md
 
 Conséquences concrètes :
 
-- **Décision du 30 oct. 2026 : passage en payant AVEC ces cartes.** La licence
-  NC reste ce qu'elle est : vendre avec ces SVG constitue un usage hors
-  licence tant que les auteurs ne l'ont pas autorisé par écrit — ce risque est
-  assumé par l'éditeur (précédent : TarkovQuestie, payant, même famille
-  d'artwork, sans DMCA public connu au 30 oct. 2026). Demander l'autorisation
-  écrite aux auteurs (the-hideout/tarkov-dev-svg-maps) reste la seule action
-  qui transforme le risque en droit : à faire en parallèle.
+- **Distribution gratuite sur GitHub** avec ces cartes : l'usage reste **non
+  commercial**, ce qui est conforme à la licence CC BY-NC-SA 4.0. Aucun achat,
+  aucune vente : l'app est et reste gratuite.
 - **Attribution obligatoire** : garde `CREDITS.md` dans le paquet (exigée par
-  la licence, et la seule chose qui rend l'usage des cartes défendable).
+  la licence).
 - **Cartes utilisées telles quelles** : ne pas les retoucher (une adaptation
   déclenche le ShareAlike sur l'adaptation).
 - Le dépôt des cartes **interdit leur usage dans un logiciel de triche** (radar, ESP, bots). Cette app lit uniquement des fichiers écrits par le jeu (logs, captures) : garde-la ainsi.
-- **Modèle de licence de l'app** : un achat itch = licence à vie, 1 appareil
-  (libération self-service 1×/30 j), essai 3 jours — cf.
-  `license-worker/README.md` (checklist de mise en vente).
 
 ## 5. Après publication
 

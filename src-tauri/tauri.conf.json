@@ -52,13 +52,13 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "C:/Users/Sinqy/Documents/tarkov-tracker/assets/tarkov-server.exe": "tarkov-server.exe"
+      "../assets/tarkov-server.exe": "tarkov-server.exe"
     }
   },
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://yelt.itch.io/kappa-buddy/download/kappa-buddy/latest.json"
+        "https://github.com/KCDQYaniss/Kappa-Buddy-Dist/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDkzODZDRjUwQkJGMzk5MDEKUldRQm1mTzdVTStHazRXamFyOUt1Rk4rQVAybUNWVTNmQ283UUd1aFBZOVR2eTZaMTJWU3NmNjkK"
     }
