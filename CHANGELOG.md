@@ -1,5 +1,15 @@
 # Changelog / Journal des modifications
 
+## 1.0.2 — Vue tactique retirée
+
+### FR
+- **La « vue tactique » disparaît** : ce fond de carte généré depuis les données de jeu (grille, densité de loot, zones) n'avait pas d'intérêt face aux cartes communautaires et alourdissait l'interface. Le bouton, le module et ses tests sont retirés ; la carte utilise désormais uniquement les cartes tarkov-dev (CC BY-NC-SA).
+- Aucun autre changement : la détection d'étage introduite en 1.0.1 est inchangée.
+
+### EN
+- **The “tactical view” is gone**: that map background generated from game data (grid, loot density, zones) added nothing over the community maps and cluttered the UI. The button, module and its tests are removed; the map now only uses the tarkov-dev maps (CC BY-NC-SA).
+- Nothing else changes: the floor detection introduced in 1.0.1 is untouched.
+
 ## 1.0.1 — Détection des étages réparée (hauteur + zone au sol)
 
 ### FR
